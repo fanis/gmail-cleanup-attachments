@@ -192,6 +192,14 @@
 
   .status-bar .count { color: var(--text); font-weight: 500; }
   .status-bar .selected-size { color: var(--warning); font-weight: 500; }
+  .status-bar .spacer { flex: 1; }
+
+  .pagination-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
 
   /* Table */
   .table-container {
@@ -613,6 +621,11 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .strip-msg-header .strip-msg-date {
+    color: var(--text-dim);
+    font-size: 12px;
+    white-space: nowrap;
+  }
   .strip-msg-header .strip-msg-size {
     color: var(--warning);
     font-family: monospace;
@@ -709,6 +722,14 @@
     <label for="extra-query" style="margin-left:8px">Extra filter</label>
     <input type="text" id="extra-query" placeholder="e.g. has:attachment older_than:1y">
 
+    <label for="per-page" style="margin-left:8px">Show</label>
+    <select id="per-page">
+      <option value="10">10</option>
+      <option value="50">50</option>
+      <option value="100" selected>100</option>
+      <option value="500">500</option>
+    </select>
+
     <button class="btn btn-primary" id="btn-search" onclick="searchMessages()">Search</button>
 
     <span class="spacer"></span>
@@ -721,6 +742,8 @@
 
   <div class="status-bar" id="status-bar" style="display:none">
     <span id="status-text"></span>
+    <span class="spacer"></span>
+    <span class="pagination-inline" id="pagination-top"></span>
   </div>
 
   <div class="table-container">
@@ -811,10 +834,12 @@ let gapiInited = false;
 let gisInited = false;
 let messages = [];       // fetched message details
 let selectedIds = new Set();
+let selectedMeta = new Map(); // msgId -> {from, subject, size} for cross-page tracking
 let sortField = 'size';
 let sortDir = -1;        // -1 = descending
 let currentPageToken = null;
-let pageTokenStack = [];  // for back navigation
+let pageTokens = [null];  // index = page number, value = token to fetch that page. [null] = page 1 needs no token
+let currentPage = 0;      // index into pageTokens
 let isLoading = false;
 let labelMap = {};       // id -> display name
 let currentPreviewMsgId = null;
@@ -986,10 +1011,12 @@ function handleSignout() {
   document.getElementById('user-info').textContent = '';
   messages = [];
   selectedIds.clear();
+  selectedMeta.clear();
 }
 
 // -- Search --
-async function searchMessages(pageToken) {
+// page: page index to navigate to. undefined = fresh search (resets pagination).
+async function searchMessages(page) {
   if (isLoading) return;
   isLoading = true;
 
@@ -999,22 +1026,40 @@ async function searchMessages(pageToken) {
   let query = `larger:${size}${unit}`;
   if (extra) query += ' ' + extra;
 
+  // Fresh search vs page navigation
+  if (page === undefined) {
+    pageTokens = [null];
+    currentPage = 0;
+    selectedIds.clear();
+    selectedMeta.clear();
+  } else {
+    currentPage = page;
+  }
+
+  const pageToken = pageTokens[currentPage] || null;
+
   const btn = document.getElementById('btn-search');
   btn.disabled = true;
   btn.textContent = 'Searching...';
   showProgress(0);
 
   try {
-    // Step 1: List message IDs
-    const listParams = { userId: 'me', q: query, maxResults: 50 };
+    const perPage = parseInt(document.getElementById('per-page').value, 10);
+    const listParams = { userId: 'me', q: query, maxResults: perPage };
     if (pageToken) listParams.pageToken = pageToken;
 
     const listResp = await gapi.client.gmail.users.messages.list(listParams);
     const result = listResp.result;
 
+    currentPageToken = result.nextPageToken || null;
+
+    // Store next page token if we got one
+    if (currentPageToken && pageTokens.length <= currentPage + 1) {
+      pageTokens.push(currentPageToken);
+    }
+
     if (!result.messages || result.messages.length === 0) {
       messages = [];
-      currentPageToken = null;
       renderTable();
       updateStatus();
       isLoading = false;
@@ -1023,8 +1068,6 @@ async function searchMessages(pageToken) {
       hideProgress();
       return;
     }
-
-    currentPageToken = result.nextPageToken || null;
 
     // Step 2: Fetch details for each message (batch via individual gets)
     const ids = result.messages.map(m => m.id);
@@ -1065,8 +1108,7 @@ async function searchMessages(pageToken) {
       showProgress(Math.round(((i + batch.length) / ids.length) * 100));
     }
 
-    // Sort by size desc by default
-    selectedIds.clear();
+    // Sort by size desc by default (only reset sort, not selection)
     sortField = 'size';
     sortDir = -1;
     sortMessages();
@@ -1121,6 +1163,8 @@ function renderTable() {
     table.style.display = 'none';
     empty.style.display = '';
     document.getElementById('pagination').innerHTML = '';
+    document.getElementById('pagination-top').innerHTML = '';
+    renderPagination();
     return;
   }
 
@@ -1178,31 +1222,39 @@ function renderTable() {
     messages.length > 0 && messages.every(m => selectedIds.has(m.id));
 
   // Pagination
-  const pag = document.getElementById('pagination');
-  pag.innerHTML = '';
-  if (pageTokenStack.length > 0) {
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-secondary btn-small';
-    btn.textContent = 'Previous Page';
-    btn.onclick = () => {
-      pageTokenStack.pop(); // remove current
-      const prev = pageTokenStack.pop() || undefined;
-      searchMessages(prev);
-    };
-    pag.appendChild(btn);
-  }
-  if (currentPageToken) {
-    if (pageTokenStack.length === 0 || pageTokenStack[pageTokenStack.length - 1] !== currentPageToken) {
-      pageTokenStack.push(currentPageToken);
-    }
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-secondary btn-small';
-    btn.textContent = 'Next Page';
-    btn.onclick = () => searchMessages(currentPageToken);
-    pag.appendChild(btn);
-  }
+  renderPagination();
 
   updateTrashButton();
+}
+
+function renderPagination() {
+  for (const id of ['pagination-top', 'pagination']) {
+    const pag = document.getElementById(id);
+    pag.innerHTML = '';
+
+    if (currentPage > 0) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-secondary btn-small';
+      btn.textContent = 'Previous Page';
+      btn.onclick = () => searchMessages(currentPage - 1);
+      pag.appendChild(btn);
+    }
+
+    if (currentPage > 0 || currentPageToken) {
+      const span = document.createElement('span');
+      span.style.cssText = 'font-size:13px;color:var(--text-dim);padding:0 8px';
+      span.textContent = `Page ${currentPage + 1}`;
+      pag.appendChild(span);
+    }
+
+    if (currentPageToken) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-secondary btn-small';
+      btn.textContent = 'Next Page';
+      btn.onclick = () => searchMessages(currentPage + 1);
+      pag.appendChild(btn);
+    }
+  }
 }
 
 function updateStatus() {
@@ -1212,11 +1264,17 @@ function updateStatus() {
 
   const totalSize = messages.reduce((sum, m) => sum + m.size, 0);
   const selCount = selectedIds.size;
-  const selSize = messages.filter(m => selectedIds.has(m.id)).reduce((sum, m) => sum + m.size, 0);
+  let selSize = 0;
+  for (const meta of selectedMeta.values()) selSize += meta.size;
+  const onThisPage = messages.filter(m => selectedIds.has(m.id)).length;
 
   let html = `<span class="count">${messages.length}</span> messages shown (${formatSize(totalSize)} total)`;
   if (selCount > 0) {
-    html += ` &mdash; <span class="selected-size">${selCount} selected (${formatSize(selSize)})</span>`;
+    let selLabel = `${selCount} selected (${formatSize(selSize)})`;
+    if (selCount > onThisPage) {
+      selLabel += ` - ${selCount - onThisPage} on other pages`;
+    }
+    html += ` &mdash; <span class="selected-size">${selLabel}</span>`;
   }
   text.innerHTML = html;
 }
@@ -1268,12 +1326,21 @@ function handleCheckboxClick(rowIdx, event) {
   syncCheckboxes();
 }
 
-function selectRange(fromIdx, toIdx) {
+function selectRange(fromIdx, toIdx, forceState) {
   const start = Math.min(fromIdx, toIdx);
   const end = Math.max(fromIdx, toIdx);
+  // If forceState not given, determine from the target row (toIdx)
+  const select = forceState !== undefined ? forceState : !selectedIds.has(messages[toIdx]?.id);
   for (let i = start; i <= end; i++) {
     const msg = messages[i];
-    if (msg) selectedIds.add(msg.id);
+    if (!msg) continue;
+    if (select) {
+      selectedIds.add(msg.id);
+      selectedMeta.set(msg.id, { from: msg.from, subject: msg.subject, size: msg.size });
+    } else {
+      selectedIds.delete(msg.id);
+      selectedMeta.delete(msg.id);
+    }
   }
   renderTable();
   updateStatus();
@@ -1296,8 +1363,14 @@ function syncCheckboxes() {
 }
 
 function toggleSelect(id, checked) {
-  if (checked) selectedIds.add(id);
-  else selectedIds.delete(id);
+  if (checked) {
+    selectedIds.add(id);
+    const msg = messages.find(m => m.id === id);
+    if (msg) selectedMeta.set(id, { from: msg.from, subject: msg.subject, size: msg.size });
+  } else {
+    selectedIds.delete(id);
+    selectedMeta.delete(id);
+  }
 
   // Update row highlight
   const rows = document.getElementById('results-body').rows;
@@ -1320,8 +1393,13 @@ function toggleSelect(id, checked) {
 
 function toggleSelectAll(checked) {
   for (const msg of messages) {
-    if (checked) selectedIds.add(msg.id);
-    else selectedIds.delete(msg.id);
+    if (checked) {
+      selectedIds.add(msg.id);
+      selectedMeta.set(msg.id, { from: msg.from, subject: msg.subject, size: msg.size });
+    } else {
+      selectedIds.delete(msg.id);
+      selectedMeta.delete(msg.id);
+    }
   }
   renderTable();
   updateStatus();
@@ -1330,7 +1408,8 @@ function toggleSelectAll(checked) {
 // -- Delete / Trash --
 function confirmTrash() {
   const count = selectedIds.size;
-  const size = messages.filter(m => selectedIds.has(m.id)).reduce((sum, m) => sum + m.size, 0);
+  let size = 0;
+  for (const meta of selectedMeta.values()) size += meta.size;
 
   document.getElementById('dialog-title').textContent = 'Move to Trash?';
   document.getElementById('dialog-body').textContent =
@@ -1349,7 +1428,8 @@ function closeDialog() {
 async function executeTrash() {
   closeDialog();
   const ids = [...selectedIds];
-  const trashedSizes = messages.filter(m => selectedIds.has(m.id)).reduce((sum, m) => sum + m.size, 0);
+  let trashedSizes = 0;
+  for (const meta of selectedMeta.values()) trashedSizes += meta.size;
   const btn = document.getElementById('btn-trash');
   btn.disabled = true;
   btn.textContent = 'Trashing...';
@@ -1380,6 +1460,7 @@ async function executeTrash() {
   const trashedSet = new Set(ids);
   messages = messages.filter(m => !trashedSet.has(m.id));
   selectedIds.clear();
+  selectedMeta.clear();
   renderTable();
   updateStatus();
   hideProgress();
@@ -1413,15 +1494,17 @@ async function confirmStrip() {
       const msg = resp.result;
       const from = findHeader(msg.payload, 'From') || '?';
       const subject = findHeader(msg.payload, 'Subject') || '(no subject)';
+      const dateStr = findHeader(msg.payload, 'Date') || '';
+      const date = dateStr ? formatDate(new Date(dateStr)) : '';
       const attachments = [];
       collectAttachments(msg.payload, attachments);
-      // Filter to real attachments only (skip inline images, etc.)
       const strippable = attachments.filter(a => a.filename && a.size > 0);
       if (strippable.length > 0) {
         stripReviewData.push({
           msgId,
           from: parseFrom(from),
           subject,
+          date,
           attachments: strippable.map(a => ({ filename: a.filename, size: a.size, checked: true })),
         });
       }
@@ -1453,6 +1536,7 @@ function renderStripModal() {
       <div class="strip-msg-header">
         <span class="strip-msg-from">${escHtml(msg.from)}</span>
         <span class="strip-msg-subject">${escHtml(msg.subject)}</span>
+        <span class="strip-msg-date">${escHtml(msg.date)}</span>
         <span class="strip-msg-size">${formatSize(totalSize)}</span>
       </div>
       <div class="strip-att-list">`;
@@ -1548,6 +1632,7 @@ async function executeSelectiveStrip() {
   const processedIds = new Set(jobs.map(j => j.msgId));
   messages = messages.filter(m => !processedIds.has(m.id));
   selectedIds = new Set([...selectedIds].filter(id => !processedIds.has(id)));
+  for (const id of processedIds) selectedMeta.delete(id);
   renderTable();
   updateStatus();
   hideProgress();

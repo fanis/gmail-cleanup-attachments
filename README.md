@@ -2,23 +2,25 @@
 
 Single-file, client-side web app for cleaning up Gmail. Find large emails, preview them, trash what you don't need, strip attachments from emails you want to keep. Everything runs in your browser and no data leaves your machine.
 
-![Selecting emails for attachment stripping](screenshot-select.jpg)
+![Main view with session stats, selections, and labels](screenshot-main.jpg)
 
-![Result after stripping 31 messages, 364.7 MB saved](screenshot-result.jpg)
+![Email preview with rendered HTML body](screenshot-preview.jpg)
+
+![Selective attachment stripping review](screenshot-strip-review.jpg)
 
 ## Features
 
-- **Search** by size with Gmail query filters (`larger:10M`, `has:attachment`, `older_than:1y`, etc.). Auto-searches on connect.
+- **Search** by size with Gmail query filters (`larger:10M`, `has:attachment`, `older_than:1y`, etc.). Auto-searches on connect. Configurable results per page (10/50/100/500).
 - **Sortable results** by sender, subject, date, or size
-- **Shift+click** to select a range of rows
-- **Email preview** - click any subject to see the full rendered email with From, To, Date headers, a link to open in Gmail, and inline attachment previews (images, text)
-- **Attachment preview** - click an attachment to preview images and text files inline, or download other types. Previewed attachment gets a highlighted border.
-- **Bulk trash** - select and trash multiple emails at once
+- **Shift+click** to select or deselect a range of rows. Selections persist across pages.
+- **Email preview** - click any subject to see the full rendered email with From, To, Date headers, a link to open in Gmail, and inline attachment previews (images, text). Esc to close.
+- **Attachment preview** - click an attachment to preview images and text files inline, or download other types.
+- **Bulk trash** - select and trash multiple emails, including across pages
 - **Selective attachment stripping** - two ways:
   - **From the preview panel**: each attachment has a checkbox. Uncheck the ones you want to keep, click "Strip Checked" to strip only the selected attachments from that email.
   - **From the toolbar**: select emails, click "Strip Attachments". A review modal shows every email with its attachments listed individually. Uncheck any attachment you want to keep across all selected emails, then confirm.
 - **Safe**: originals go to Trash (recoverable for 30 days). Inline images referenced by the HTML body are preserved. Removed attachments are replaced with a text stub noting filename and size.
-- **Session stats** in the header showing emails processed and space freed
+- **Session stats** in the header showing emails trashed, stripped, and space freed
 - **Persistent auth** - OAuth token cached in localStorage, no re-authentication on page reload
 
 ## Setup
@@ -50,7 +52,8 @@ Open `http://localhost:9123` in your browser, enter your Client ID and API Key, 
 
 - Set the size threshold and optionally add Gmail search filters, press Enter or click Search
 - Click any row to toggle selection, or use the checkbox
-- Shift+click to select a range of rows between the last clicked and current
+- Shift+click to select or deselect a range of rows
+- Selections persist across pages - the status bar shows how many are selected on other pages
 - Click a subject to open the preview panel (Esc to close)
 
 ### Trashing emails
@@ -59,7 +62,7 @@ Select emails, click **Trash Selected**. Emails move to Gmail Trash (auto-delete
 
 ### Stripping attachments
 
-**Bulk (from toolbar):** Select emails, click **Strip Attachments**. A review modal lists every selected email with its attachments. Each attachment has a checkbox (all checked by default). Uncheck any you want to keep, then confirm. Shows total count and size of what will be stripped.
+**Bulk (from toolbar):** Select emails, click **Strip Attachments**. A review modal lists every selected email with its attachments, date, and size. Each attachment has a checkbox (all checked by default). Uncheck any you want to keep, then confirm. Shows total count and size of what will be stripped.
 
 **Per-email (from preview):** Open an email preview, check/uncheck individual attachments, click **Strip Checked** at the bottom of the panel.
 
