@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gmail Cleanup - Find &amp; Delete Large Emails</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --accent: #e94560;
+    --accent-hover: #ff6b81;
+    --text: #eee;
+    --text-dim: #999;
+    --border: #2a2a4a;
+    --success: #2ecc71;
+    --warning: #f39c12;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  header h1 {
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .user-info {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .session-stats {
+    font-size: 12px;
+    color: var(--success);
+    background: rgba(46, 204, 113, 0.1);
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+
+  /* Setup panel */
+  #setup-panel {
+    max-width: 640px;
+    margin: 60px auto;
+    padding: 32px;
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+
+  #setup-panel h2 { margin-bottom: 16px; font-size: 18px; }
+  #setup-panel p { color: var(--text-dim); line-height: 1.6; margin-bottom: 12px; font-size: 14px; }
+  #setup-panel ol { padding-left: 20px; margin-bottom: 20px; }
+  #setup-panel li { color: var(--text-dim); line-height: 1.8; font-size: 14px; }
+  #setup-panel code {
+    background: var(--bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+    color: var(--accent);
+  }
+
+  .cred-form { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+  .cred-form label { font-size: 13px; color: var(--text-dim); }
+  .cred-form input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: monospace;
+  }
+  .cred-form input:focus { outline: none; border-color: var(--accent); }
+
+  .cred-note {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 8px 18px;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+  }
+  .btn-secondary:hover { background: #1a4a7a; }
+
+  .btn-danger {
+    background: #c0392b;
+    color: #fff;
+  }
+  .btn-danger:hover { background: #e74c3c; }
+  .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-small {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  /* Main content */
+  #app { display: none; }
+
+  .toolbar {
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .toolbar label { font-size: 13px; color: var(--text-dim); }
+
+  .toolbar select, .toolbar input[type="number"] {
+    padding: 6px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  .toolbar input[type="text"] {
+    padding: 6px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-size: 14px;
+    width: 200px;
+  }
+
+  .toolbar select:focus, .toolbar input:focus { outline: none; border-color: var(--accent); }
+
+  .toolbar .spacer { flex: 1; }
+
+  /* Status bar */
+  .status-bar {
+    padding: 10px 24px;
+    font-size: 13px;
+    color: var(--text-dim);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .status-bar .count { color: var(--text); font-weight: 500; }
+  .status-bar .selected-size { color: var(--warning); font-weight: 500; }
+
+  /* Table */
+  .table-container {
+    overflow-x: auto;
+    padding: 0 24px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+  }
+
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    border-bottom: 2px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  th:hover { color: var(--text); }
+  th.sorted { color: var(--accent); }
+  th .sort-arrow { margin-left: 4px; font-size: 10px; }
+
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    vertical-align: middle;
+  }
+
+  tr:hover { background: rgba(233, 69, 96, 0.05); }
+  tr.selected { background: rgba(233, 69, 96, 0.1); }
+
+  .col-check { width: 40px; text-align: center; }
+  .col-from { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .col-subject { max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .col-date { white-space: nowrap; width: 140px; }
+  .col-size { white-space: nowrap; width: 100px; text-align: right; font-family: monospace; }
+  .col-labels { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .label-tag {
+    display: inline-block;
+    background: var(--surface2);
+    color: var(--text-dim);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    margin-right: 4px;
+  }
+
+  input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--accent);
+  }
+
+  /* Pagination */
+  .pagination {
+    padding: 16px 24px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  /* Loading spinner */
+  .spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toast notifications */
+  .toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 1000;
+  }
+
+  .toast {
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    animation: slideIn 0.3s ease;
+    max-width: 400px;
+  }
+
+  .toast-success { background: var(--success); color: #fff; }
+  .toast-error { background: #c0392b; color: #fff; }
+  .toast-info { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+
+  @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } }
+
+  /* Progress bar */
+  .progress-bar {
+    height: 3px;
+    background: var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-bar .fill {
+    height: 100%;
+    background: var(--accent);
+    transition: width 0.3s;
+  }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--text-dim);
+  }
+  .empty-state p { font-size: 16px; margin-bottom: 8px; }
+  .empty-state .hint { font-size: 13px; }
+
+  /* Confirm dialog overlay */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+  }
+  .overlay.hidden { display: none; }
+
+  .dialog {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 440px;
+    width: 90%;
+  }
+  .dialog h3 { margin-bottom: 12px; }
+  .dialog p { color: var(--text-dim); font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+  .dialog .actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* Preview panel */
+  .preview-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 998;
+  }
+  .preview-overlay.hidden { display: none; }
+
+  .preview-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 55%;
+    max-width: 800px;
+    height: 100vh;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+  }
+  .preview-panel.open { transform: translateX(0); }
+
+  .preview-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .preview-header .preview-meta { flex: 1; min-width: 0; }
+  .preview-header h3 {
+    font-size: 16px;
+    margin-bottom: 6px;
+    word-wrap: break-word;
+  }
+  .preview-header .preview-from {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 2px;
+  }
+  .preview-header .preview-date {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .preview-header .preview-gmail-link {
+    font-size: 12px;
+    color: var(--accent);
+    text-decoration: none;
+    margin-top: 4px;
+    display: inline-block;
+  }
+  .preview-header .preview-gmail-link:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+  }
+  .preview-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 22px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .preview-close:hover { color: var(--text); }
+
+  .preview-attachments {
+    padding: 8px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .preview-attachments span {
+    display: inline-block;
+    background: var(--surface2);
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-right: 6px;
+    margin-bottom: 4px;
+  }
+
+  .preview-body {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+  }
+  .preview-body iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #fff;
+  }
+  .preview-body .preview-text {
+    padding: 20px;
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+  }
+  .preview-loading {
+    padding: 40px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+
+  /* Make subject clickable */
+  .col-subject-link {
+    color: var(--text);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .col-subject-link:hover { color: var(--accent); text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Gmail Cleanup</h1>
+  <div class="header-actions">
+    <span class="session-stats" id="session-stats" style="display:none"></span>
+    <span class="user-info" id="user-info"></span>
+    <button class="btn btn-secondary btn-small" id="btn-signout" style="display:none" onclick="handleSignout()">Sign Out</button>
+  </div>
+</header>
+
+<!-- Setup / Auth Panel -->
+<div id="setup-panel">
+  <h2>Setup</h2>
+  <p>This tool runs entirely in your browser. No data is sent to any server. You need a Google Cloud project with the Gmail API enabled.</p>
+  <ol>
+    <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent)">Google Cloud Console &gt; Credentials</a></li>
+    <li>Create a project (or use an existing one)</li>
+    <li>Enable the <strong>Gmail API</strong> under "APIs &amp; Services"</li>
+    <li>Create an <strong>OAuth 2.0 Client ID</strong> (type: Web application)</li>
+    <li>Add <code>http://localhost</code> (or wherever you serve this file) to <strong>Authorized JavaScript origins</strong></li>
+    <li>Create an <strong>API Key</strong> (restrict it to Gmail API for safety)</li>
+    <li>If the app is in "Testing" mode, add your Gmail address as a test user under the OAuth consent screen</li>
+  </ol>
+
+  <div class="cred-form">
+    <div>
+      <label for="input-client-id">OAuth Client ID</label>
+      <input type="text" id="input-client-id" placeholder="123456789-xxxxxxxxx.apps.googleusercontent.com">
+    </div>
+    <div>
+      <label for="input-api-key">API Key</label>
+      <input type="text" id="input-api-key" placeholder="AIzaSy...">
+    </div>
+    <p class="cred-note">Credentials are stored in localStorage so you don't have to re-enter them. They never leave your browser.</p>
+    <button class="btn btn-primary" id="btn-connect" onclick="handleConnect()">Connect to Gmail</button>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app">
+  <div class="toolbar" onkeydown="if(event.key==='Enter')searchMessages()">
+    <label for="size-threshold">Larger than</label>
+    <input type="number" id="size-threshold" value="5" min="1" style="width:70px">
+    <select id="size-unit">
+      <option value="M" selected>MB</option>
+      <option value="K">KB</option>
+    </select>
+
+    <label for="extra-query" style="margin-left:8px">Extra filter</label>
+    <input type="text" id="extra-query" placeholder="e.g. has:attachment older_than:1y">
+
+    <button class="btn btn-primary" id="btn-search" onclick="searchMessages()">Search</button>
+
+    <span class="spacer"></span>
+
+    <button class="btn btn-secondary" id="btn-strip" disabled onclick="confirmStrip()">Strip Attachments</button>
+    <button class="btn btn-danger" id="btn-trash" disabled onclick="confirmTrash()">Trash Selected</button>
+  </div>
+
+  <div class="progress-bar" id="progress-bar" style="display:none"><div class="fill" id="progress-fill"></div></div>
+
+  <div class="status-bar" id="status-bar" style="display:none">
+    <span id="status-text"></span>
+  </div>
+
+  <div class="table-container">
+    <table id="results-table" style="display:none">
+      <thead>
+        <tr>
+          <th class="col-check"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)"></th>
+          <th class="col-from" onclick="sortBy('from')">From <span class="sort-arrow"></span></th>
+          <th class="col-subject" onclick="sortBy('subject')">Subject <span class="sort-arrow"></span></th>
+          <th class="col-date" onclick="sortBy('date')">Date <span class="sort-arrow"></span></th>
+          <th class="col-size sorted" onclick="sortBy('size')">Size <span class="sort-arrow">&#9660;</span></th>
+          <th class="col-labels">Labels</th>
+        </tr>
+      </thead>
+      <tbody id="results-body"></tbody>
+    </table>
+  </div>
+
+  <div id="empty-state" class="empty-state" style="display:none">
+    <p>No messages found</p>
+    <span class="hint">Try a smaller size threshold or different filters</span>
+  </div>
+
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<!-- Preview Panel -->
+<div class="preview-overlay hidden" id="preview-overlay" onclick="closePreview()"></div>
+<div class="preview-panel" id="preview-panel">
+  <div class="preview-header">
+    <div class="preview-meta">
+      <div class="preview-from" id="preview-from"></div>
+      <div class="preview-from" id="preview-to"></div>
+      <h3 id="preview-subject"></h3>
+      <div class="preview-date" id="preview-date"></div>
+      <a class="preview-gmail-link" id="preview-gmail-link" href="#" target="_blank" style="display:none">View in Gmail</a>
+    </div>
+    <button class="preview-close" onclick="closePreview()">&times;</button>
+  </div>
+  <div class="preview-attachments" id="preview-attachments" style="display:none"></div>
+  <div class="preview-body" id="preview-body">
+    <div class="preview-loading">Click a subject to preview</div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="overlay hidden" id="confirm-dialog">
+  <div class="dialog">
+    <h3 id="dialog-title">Move to Trash?</h3>
+    <p id="dialog-body"></p>
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="closeDialog()">Cancel</button>
+      <button class="btn btn-danger" id="btn-confirm-action" onclick="executeTrash()">Move to Trash</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// -- State --
+let tokenClient;
+let gapiInited = false;
+let gisInited = false;
+let messages = [];       // fetched message details
+let selectedIds = new Set();
+let sortField = 'size';
+let sortDir = -1;        // -1 = descending
+let currentPageToken = null;
+let pageTokenStack = [];  // for back navigation
+let isLoading = false;
+let labelMap = {};       // id -> display name
+let currentPreviewMsgId = null;
+let sessionTrashed = 0;      // count of trashed messages
+let sessionStripped = 0;     // count of stripped messages
+let sessionBytesSaved = 0;   // total bytes freed
+
+const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest';
+const SCOPES = 'https://www.googleapis.com/auth/gmail.modify';
+const SYSTEM_LABELS_HIDDEN = new Set(['IMPORTANT', 'CATEGORY_PERSONAL', 'CATEGORY_SOCIAL',
+  'CATEGORY_PROMOTIONS', 'CATEGORY_UPDATES', 'CATEGORY_FORUMS']);
+
+// -- Credentials --
+function loadCredentials() {
+  const clientId = localStorage.getItem('gmail_cleanup_client_id') || '';
+  const apiKey = localStorage.getItem('gmail_cleanup_api_key') || '';
+  document.getElementById('input-client-id').value = clientId;
+  document.getElementById('input-api-key').value = apiKey;
+  return { clientId, apiKey };
+}
+
+function saveCredentials(clientId, apiKey) {
+  localStorage.setItem('gmail_cleanup_client_id', clientId);
+  localStorage.setItem('gmail_cleanup_api_key', apiKey);
+}
+
+// -- Init --
+let gapiClientReady;
+const gapiClientPromise = new Promise(resolve => { gapiClientReady = resolve; });
+
+let gisReady;
+const gisPromise = new Promise(resolve => { gisReady = resolve; });
+
+function onGapiLoad() {
+  gapi.load('client', () => {
+    gapiInited = true;
+    gapiClientReady();
+    maybeAutoConnect();
+  });
+}
+
+function onGisLoad() {
+  gisInited = true;
+  gisReady();
+  maybeAutoConnect();
+}
+
+async function maybeAutoConnect() {
+  if (!gapiInited || !gisInited) return;
+  const { clientId, apiKey } = loadCredentials();
+  if (!clientId || !apiKey) return;
+
+  // Try to restore saved token
+  const saved = localStorage.getItem('gmail_cleanup_token');
+  if (!saved) return;
+
+  try {
+    const token = JSON.parse(saved);
+    // Check if token is still valid (expires_in is in seconds, saved_at in ms)
+    const elapsed = (Date.now() - (token._saved_at || 0)) / 1000;
+    const expiresIn = parseInt(token.expires_in || '3600', 10);
+    if (elapsed >= expiresIn - 60) {
+      // Token expired or about to expire
+      localStorage.removeItem('gmail_cleanup_token');
+      return;
+    }
+
+    await gapi.client.init({
+      apiKey: apiKey,
+      discoveryDocs: [DISCOVERY_DOC],
+    });
+    gapi.client.setToken(token);
+    onAuthed();
+  } catch (e) {
+    localStorage.removeItem('gmail_cleanup_token');
+  }
+}
+
+async function handleConnect() {
+  const clientId = document.getElementById('input-client-id').value.trim();
+  const apiKey = document.getElementById('input-api-key').value.trim();
+
+  if (!clientId || !apiKey) {
+    toast('Both Client ID and API Key are required', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btn-connect');
+  btn.disabled = true;
+  btn.textContent = 'Connecting...';
+  saveCredentials(clientId, apiKey);
+
+  try {
+    // Wait for both libraries to be fully loaded
+    await gapiClientPromise;
+    await gisPromise;
+
+    await gapi.client.init({
+      apiKey: apiKey,
+      discoveryDocs: [DISCOVERY_DOC],
+    });
+
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: SCOPES,
+      callback: (resp) => {
+        if (resp.error) {
+          toast('Auth failed: ' + resp.error, 'error');
+          btn.disabled = false;
+          btn.textContent = 'Connect to Gmail';
+          return;
+        }
+        // Save token with expiry
+        const token = gapi.client.getToken();
+        if (token) {
+          token._saved_at = Date.now();
+          localStorage.setItem('gmail_cleanup_token', JSON.stringify(token));
+        }
+        onAuthed();
+      },
+    });
+
+    tokenClient.requestAccessToken({ prompt: 'select_account' });
+  } catch (e) {
+    toast('Init failed: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = 'Connect to Gmail';
+  }
+}
+
+async function onAuthed() {
+  document.getElementById('setup-panel').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('btn-signout').style.display = '';
+
+  // Show user email
+  try {
+    const profile = await gapi.client.gmail.users.getProfile({ userId: 'me' });
+    document.getElementById('user-info').textContent = profile.result.emailAddress;
+  } catch (e) { /* ignore */ }
+
+  // Fetch label names
+  try {
+    const labelsResp = await gapi.client.gmail.users.labels.list({ userId: 'me' });
+    const labels = labelsResp.result.labels || [];
+    labelMap = {};
+    for (const l of labels) {
+      labelMap[l.id] = l.name;
+    }
+  } catch (e) { /* ignore - will fall back to raw IDs */ }
+
+  toast('Connected to Gmail', 'success');
+}
+
+function handleSignout() {
+  localStorage.removeItem('gmail_cleanup_token');
+  const token = gapi.client.getToken();
+  if (token) {
+    google.accounts.oauth2.revoke(token.access_token);
+    gapi.client.setToken('');
+  }
+  document.getElementById('setup-panel').style.display = '';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('btn-signout').style.display = 'none';
+  document.getElementById('user-info').textContent = '';
+  messages = [];
+  selectedIds.clear();
+}
+
+// -- Search --
+async function searchMessages(pageToken) {
+  if (isLoading) return;
+  isLoading = true;
+
+  const size = document.getElementById('size-threshold').value;
+  const unit = document.getElementById('size-unit').value;
+  const extra = document.getElementById('extra-query').value.trim();
+  let query = `larger:${size}${unit}`;
+  if (extra) query += ' ' + extra;
+
+  const btn = document.getElementById('btn-search');
+  btn.disabled = true;
+  btn.textContent = 'Searching...';
+  showProgress(0);
+
+  try {
+    // Step 1: List message IDs
+    const listParams = { userId: 'me', q: query, maxResults: 50 };
+    if (pageToken) listParams.pageToken = pageToken;
+
+    const listResp = await gapi.client.gmail.users.messages.list(listParams);
+    const result = listResp.result;
+
+    if (!result.messages || result.messages.length === 0) {
+      messages = [];
+      currentPageToken = null;
+      renderTable();
+      updateStatus();
+      isLoading = false;
+      btn.disabled = false;
+      btn.textContent = 'Search';
+      hideProgress();
+      return;
+    }
+
+    currentPageToken = result.nextPageToken || null;
+
+    // Step 2: Fetch details for each message (batch via individual gets)
+    const ids = result.messages.map(m => m.id);
+    messages = [];
+    const batchSize = 10;
+
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batch = ids.slice(i, i + batchSize);
+      const promises = batch.map(id =>
+        gapi.client.gmail.users.messages.get({
+          userId: 'me',
+          id: id,
+          format: 'metadata',
+          metadataHeaders: ['From', 'Subject', 'Date'],
+        })
+      );
+
+      const results = await Promise.all(promises);
+      for (const r of results) {
+        const msg = r.result;
+        const headers = {};
+        if (msg.payload && msg.payload.headers) {
+          for (const h of msg.payload.headers) {
+            headers[h.name] = h.value;
+          }
+        }
+        messages.push({
+          id: msg.id,
+          from: headers['From'] || '(unknown)',
+          subject: headers['Subject'] || '(no subject)',
+          date: headers['Date'] ? new Date(headers['Date']) : new Date(0),
+          dateRaw: headers['Date'] || '',
+          size: msg.sizeEstimate || 0,
+          labelIds: msg.labelIds || [],
+        });
+      }
+
+      showProgress(Math.round(((i + batch.length) / ids.length) * 100));
+    }
+
+    // Sort by size desc by default
+    selectedIds.clear();
+    sortField = 'size';
+    sortDir = -1;
+    sortMessages();
+    renderTable();
+    updateStatus();
+
+  } catch (e) {
+    toast('Search failed: ' + e.message, 'error');
+  }
+
+  isLoading = false;
+  btn.disabled = false;
+  btn.textContent = 'Search';
+  hideProgress();
+}
+
+// -- Sorting --
+function sortMessages() {
+  messages.sort((a, b) => {
+    let va, vb;
+    switch (sortField) {
+      case 'from': va = a.from.toLowerCase(); vb = b.from.toLowerCase(); break;
+      case 'subject': va = a.subject.toLowerCase(); vb = b.subject.toLowerCase(); break;
+      case 'date': va = a.date.getTime(); vb = b.date.getTime(); break;
+      case 'size': va = a.size; vb = b.size; break;
+      default: return 0;
+    }
+    if (va < vb) return -1 * sortDir;
+    if (va > vb) return 1 * sortDir;
+    return 0;
+  });
+}
+
+function sortBy(field) {
+  if (sortField === field) {
+    sortDir *= -1;
+  } else {
+    sortField = field;
+    sortDir = field === 'size' || field === 'date' ? -1 : 1;
+  }
+  sortMessages();
+  renderTable();
+}
+
+// -- Rendering --
+function renderTable() {
+  const tbody = document.getElementById('results-body');
+  const table = document.getElementById('results-table');
+  const empty = document.getElementById('empty-state');
+
+  if (messages.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = '';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  table.style.display = '';
+  empty.style.display = 'none';
+
+  // Update header sort indicators
+  const ths = table.querySelectorAll('thead th');
+  ths.forEach(th => {
+    th.classList.remove('sorted');
+    const arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = '';
+  });
+  const fieldIndex = { from: 1, subject: 2, date: 3, size: 4 };
+  if (fieldIndex[sortField] !== undefined) {
+    const th = ths[fieldIndex[sortField]];
+    th.classList.add('sorted');
+    th.querySelector('.sort-arrow').textContent = sortDir === -1 ? '\u25BC' : '\u25B2';
+  }
+
+  // Render rows
+  tbody.innerHTML = '';
+  for (const msg of messages) {
+    const tr = document.createElement('tr');
+    if (selectedIds.has(msg.id)) tr.classList.add('selected');
+
+    const labels = msg.labelIds
+      .filter(l => !SYSTEM_LABELS_HIDDEN.has(l))
+      .map(l => `<span class="label-tag">${escHtml(labelMap[l] || l)}</span>`)
+      .join('');
+
+    tr.innerHTML = `
+      <td class="col-check"><input type="checkbox" ${selectedIds.has(msg.id) ? 'checked' : ''} onchange="toggleSelect('${msg.id}', this.checked)"></td>
+      <td class="col-from" title="${escAttr(msg.from)}">${escHtml(parseFrom(msg.from))}</td>
+      <td class="col-subject" title="${escAttr(msg.subject)}"><a class="col-subject-link" onclick="openPreview('${msg.id}')">${escHtml(msg.subject)}</a></td>
+      <td class="col-date" title="${escAttr(msg.dateRaw)}">${formatDate(msg.date)}</td>
+      <td class="col-size">${formatSize(msg.size)}</td>
+      <td class="col-labels">${labels}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  // Update select-all checkbox
+  document.getElementById('select-all').checked =
+    messages.length > 0 && messages.every(m => selectedIds.has(m.id));
+
+  // Pagination
+  const pag = document.getElementById('pagination');
+  pag.innerHTML = '';
+  if (pageTokenStack.length > 0) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary btn-small';
+    btn.textContent = 'Previous Page';
+    btn.onclick = () => {
+      pageTokenStack.pop(); // remove current
+      const prev = pageTokenStack.pop() || undefined;
+      searchMessages(prev);
+    };
+    pag.appendChild(btn);
+  }
+  if (currentPageToken) {
+    if (pageTokenStack.length === 0 || pageTokenStack[pageTokenStack.length - 1] !== currentPageToken) {
+      pageTokenStack.push(currentPageToken);
+    }
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary btn-small';
+    btn.textContent = 'Next Page';
+    btn.onclick = () => searchMessages(currentPageToken);
+    pag.appendChild(btn);
+  }
+
+  updateTrashButton();
+}
+
+function updateStatus() {
+  const bar = document.getElementById('status-bar');
+  const text = document.getElementById('status-text');
+  bar.style.display = '';
+
+  const totalSize = messages.reduce((sum, m) => sum + m.size, 0);
+  const selCount = selectedIds.size;
+  const selSize = messages.filter(m => selectedIds.has(m.id)).reduce((sum, m) => sum + m.size, 0);
+
+  let html = `<span class="count">${messages.length}</span> messages shown (${formatSize(totalSize)} total)`;
+  if (selCount > 0) {
+    html += ` &mdash; <span class="selected-size">${selCount} selected (${formatSize(selSize)})</span>`;
+  }
+  text.innerHTML = html;
+}
+
+function updateTrashButton() {
+  const hasSelection = selectedIds.size > 0;
+  document.getElementById('btn-trash').disabled = !hasSelection;
+  document.getElementById('btn-strip').disabled = !hasSelection;
+}
+
+function updateSessionStats() {
+  const el = document.getElementById('session-stats');
+  const parts = [];
+  if (sessionTrashed > 0) parts.push(`${sessionTrashed} trashed`);
+  if (sessionStripped > 0) parts.push(`${sessionStripped} stripped`);
+  if (parts.length === 0) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.textContent = `Session: ${parts.join(', ')} | ${formatSize(sessionBytesSaved)} freed`;
+}
+
+// -- Selection --
+function toggleSelect(id, checked) {
+  if (checked) selectedIds.add(id);
+  else selectedIds.delete(id);
+
+  // Update row highlight
+  const rows = document.getElementById('results-body').rows;
+  for (const row of rows) {
+    const cb = row.querySelector('input[type="checkbox"]');
+    if (cb) {
+      const msgId = messages[row.rowIndex - 1]?.id;
+      if (msgId === id) {
+        row.classList.toggle('selected', checked);
+      }
+    }
+  }
+
+  document.getElementById('select-all').checked =
+    messages.length > 0 && messages.every(m => selectedIds.has(m.id));
+
+  updateStatus();
+  updateTrashButton();
+}
+
+function toggleSelectAll(checked) {
+  for (const msg of messages) {
+    if (checked) selectedIds.add(msg.id);
+    else selectedIds.delete(msg.id);
+  }
+  renderTable();
+  updateStatus();
+}
+
+// -- Delete / Trash --
+function confirmTrash() {
+  const count = selectedIds.size;
+  const size = messages.filter(m => selectedIds.has(m.id)).reduce((sum, m) => sum + m.size, 0);
+
+  document.getElementById('dialog-title').textContent = 'Move to Trash?';
+  document.getElementById('dialog-body').textContent =
+    `This will move ${count} message${count > 1 ? 's' : ''} (${formatSize(size)}) to Gmail's Trash. ` +
+    `Messages in Trash are auto-deleted after 30 days, or you can empty Trash manually.`;
+  const btn = document.getElementById('btn-confirm-action');
+  btn.textContent = 'Move to Trash';
+  btn.onclick = executeTrash;
+  document.getElementById('confirm-dialog').classList.remove('hidden');
+}
+
+function closeDialog() {
+  document.getElementById('confirm-dialog').classList.add('hidden');
+}
+
+async function executeTrash() {
+  closeDialog();
+  const ids = [...selectedIds];
+  const trashedSizes = messages.filter(m => selectedIds.has(m.id)).reduce((sum, m) => sum + m.size, 0);
+  const btn = document.getElementById('btn-trash');
+  btn.disabled = true;
+  btn.textContent = 'Trashing...';
+  showProgress(0);
+
+  let done = 0;
+  let errors = 0;
+
+  // Trash messages in batches
+  const batchSize = 10;
+  for (let i = 0; i < ids.length; i += batchSize) {
+    const batch = ids.slice(i, i + batchSize);
+    const promises = batch.map(id =>
+      gapi.client.gmail.users.messages.trash({ userId: 'me', id: id })
+        .then(() => { done++; })
+        .catch(() => { errors++; })
+    );
+    await Promise.all(promises);
+    showProgress(Math.round(((i + batch.length) / ids.length) * 100));
+  }
+
+  // Update session stats
+  sessionTrashed += done;
+  sessionBytesSaved += trashedSizes;
+  updateSessionStats();
+
+  // Remove trashed messages from the list
+  const trashedSet = new Set(ids);
+  messages = messages.filter(m => !trashedSet.has(m.id));
+  selectedIds.clear();
+  renderTable();
+  updateStatus();
+  hideProgress();
+
+  btn.textContent = 'Trash Selected';
+  btn.disabled = selectedIds.size === 0;
+
+  if (errors > 0) {
+    toast(`Trashed ${done} messages, ${errors} failed`, 'error');
+  } else {
+    toast(`Trashed ${done} message${done > 1 ? 's' : ''}`, 'success');
+  }
+}
+
+// -- Strip Attachments --
+function confirmStrip() {
+  const count = selectedIds.size;
+  document.getElementById('dialog-title').textContent = 'Strip Attachments?';
+  document.getElementById('dialog-body').textContent =
+    `This will remove attachments from ${count} message${count > 1 ? 's' : ''}, ` +
+    `keeping the email body and inline images intact. ` +
+    `A stripped copy is inserted and the original is moved to Trash (recoverable for 30 days).`;
+  const btn = document.getElementById('btn-confirm-action');
+  btn.textContent = 'Strip Attachments';
+  btn.onclick = executeStrip;
+  document.getElementById('confirm-dialog').classList.remove('hidden');
+}
+
+async function executeStrip() {
+  closeDialog();
+  const ids = [...selectedIds];
+  const btn = document.getElementById('btn-strip');
+  btn.disabled = true;
+  btn.textContent = 'Stripping...';
+  showProgress(0);
+
+  let done = 0;
+  let errors = 0;
+  let totalSaved = 0;
+
+  for (let i = 0; i < ids.length; i++) {
+    const msgId = ids[i];
+    try {
+      const saved = await stripOneMessage(msgId);
+      totalSaved += saved;
+      done++;
+    } catch (e) {
+      console.error('Strip failed for', msgId, e);
+      errors++;
+    }
+    showProgress(Math.round(((i + 1) / ids.length) * 100));
+  }
+
+  // Update session stats
+  sessionStripped += done;
+  sessionBytesSaved += totalSaved;
+  updateSessionStats();
+
+  // Remove processed messages from the list
+  const processedSet = new Set(ids);
+  messages = messages.filter(m => !processedSet.has(m.id));
+  selectedIds.clear();
+  renderTable();
+  updateStatus();
+  hideProgress();
+
+  btn.textContent = 'Strip Attachments';
+  btn.disabled = selectedIds.size === 0;
+
+  if (errors > 0) {
+    toast(`Stripped ${done}, ${errors} failed. Saved ${formatSize(totalSaved)}`, 'error');
+  } else {
+    toast(`Stripped attachments from ${done} message${done > 1 ? 's' : ''}. Saved ${formatSize(totalSaved)}`, 'success');
+  }
+}
+
+async function stripOneMessage(msgId) {
+  // 1. Get metadata (labels, threadId)
+  const metaResp = await gapi.client.gmail.users.messages.get({
+    userId: 'me', id: msgId, format: 'metadata',
+    metadataHeaders: ['From', 'To', 'Subject', 'Date'],
+  });
+  const meta = metaResp.result;
+  const labelIds = meta.labelIds || [];
+  const threadId = meta.threadId;
+
+  // 2. Get raw MIME
+  const rawResp = await gapi.client.gmail.users.messages.get({
+    userId: 'me', id: msgId, format: 'raw',
+  });
+  const rawB64 = rawResp.result.raw;
+  const rawStr = b64UrlToString(rawB64);
+  const originalSize = rawStr.length;
+
+  // 3. Parse and strip attachments
+  const stripped = stripMimeAttachments(rawStr);
+  const strippedSize = stripped.length;
+
+  if (stripped === rawStr) {
+    // Nothing was stripped
+    return 0;
+  }
+
+  // 4. Insert stripped copy with original labels and thread
+  const strippedB64 = stringToB64Url(stripped);
+  await gapi.client.gmail.users.messages.insert({
+    userId: 'me',
+    internalDateSource: 'dateHeader',
+    resource: {
+      raw: strippedB64,
+      labelIds: labelIds,
+      threadId: threadId,
+    },
+  });
+
+  // 5. Trash original
+  await gapi.client.gmail.users.messages.trash({ userId: 'me', id: msgId });
+
+  return originalSize - strippedSize;
+}
+
+// -- MIME Parsing & Stripping --
+function stripMimeAttachments(mimeStr) {
+  // Find the top-level Content-Type and boundary
+  const parsed = parseMimePart(mimeStr);
+  const rebuilt = rebuildStripped(parsed);
+  return rebuilt;
+}
+
+function parseMimePart(raw) {
+  // Split headers from body at first blank line
+  const splitIdx = raw.indexOf('\r\n\r\n');
+  const splitIdxLF = raw.indexOf('\n\n');
+  let headerEnd, bodyStart, lineBreak;
+
+  if (splitIdx >= 0 && (splitIdxLF < 0 || splitIdx <= splitIdxLF)) {
+    headerEnd = splitIdx;
+    bodyStart = splitIdx + 4;
+    lineBreak = '\r\n';
+  } else if (splitIdxLF >= 0) {
+    headerEnd = splitIdxLF;
+    bodyStart = splitIdxLF + 2;
+    lineBreak = '\n';
+  } else {
+    return { headers: raw, body: '', parts: null, boundary: null, lineBreak: '\r\n', raw: raw };
+  }
+
+  const headers = raw.substring(0, headerEnd);
+  const body = raw.substring(bodyStart);
+
+  // Check if multipart
+  const ctMatch = getHeaderValue(headers, 'content-type', lineBreak);
+  const boundary = ctMatch ? extractBoundary(ctMatch) : null;
+
+  let parts = null;
+  if (boundary) {
+    parts = splitByBoundary(body, boundary, lineBreak);
+  }
+
+  return { headers, body, parts, boundary, lineBreak, raw };
+}
+
+function getHeaderValue(headers, name, lineBreak) {
+  // Handle folded headers (continuation lines starting with whitespace)
+  const lines = headers.split(lineBreak || '\r\n');
+  let result = null;
+  const nameLower = name.toLowerCase();
+
+  for (let i = 0; i < lines.length; i++) {
+    if (result !== null) {
+      // Check for continuation
+      if (lines[i].match(/^[ \t]/)) {
+        result += ' ' + lines[i].trim();
+        continue;
+      } else {
+        break;
+      }
+    }
+    const colonIdx = lines[i].indexOf(':');
+    if (colonIdx > 0) {
+      const hName = lines[i].substring(0, colonIdx).trim().toLowerCase();
+      if (hName === nameLower) {
+        result = lines[i].substring(colonIdx + 1).trim();
+      }
+    }
+  }
+  return result;
+}
+
+function extractBoundary(contentType) {
+  const m = contentType.match(/boundary\s*=\s*"?([^";\s]+)"?/i);
+  return m ? m[1] : null;
+}
+
+function splitByBoundary(body, boundary, lineBreak) {
+  const delim = '--' + boundary;
+  const endDelim = '--' + boundary + '--';
+
+  // Find all parts between delimiters
+  const parts = [];
+  let idx = body.indexOf(delim);
+  if (idx < 0) return null;
+
+  while (true) {
+    // Move past the delimiter line
+    let lineEnd = body.indexOf(lineBreak, idx);
+    if (lineEnd < 0) break;
+    const partStart = lineEnd + lineBreak.length;
+
+    // Find next delimiter
+    const nextDelim = body.indexOf(delim, partStart);
+    if (nextDelim < 0) break;
+
+    // Part content is between partStart and nextDelim (minus trailing linebreak)
+    let partEnd = nextDelim;
+    if (body.substring(partEnd - lineBreak.length, partEnd) === lineBreak) {
+      partEnd -= lineBreak.length;
+    }
+
+    const partRaw = body.substring(partStart, partEnd);
+    parts.push(parseMimePart(partRaw));
+
+    // Check if this is the closing delimiter
+    if (body.substring(nextDelim, nextDelim + endDelim.length) === endDelim) {
+      break;
+    }
+    idx = nextDelim;
+  }
+
+  return parts;
+}
+
+function isAttachmentPart(part) {
+  const disp = getHeaderValue(part.headers, 'content-disposition', part.lineBreak) || '';
+  const ct = getHeaderValue(part.headers, 'content-type', part.lineBreak) || '';
+  const filename = disp.match(/filename\s*=\s*"?([^";\n]+)/i) || ct.match(/name\s*=\s*"?([^";\n]+)/i);
+
+  if (!filename && !/attachment/i.test(disp)) {
+    return null; // Not an attachment
+  }
+
+  return {
+    filename: filename ? filename[1].trim() : '(unnamed)',
+    isInline: /inline/i.test(disp),
+    contentId: getHeaderValue(part.headers, 'content-id', part.lineBreak),
+  };
+}
+
+function collectCidRefs(part) {
+  const cids = new Set();
+  if (!part.parts) {
+    const ct = getHeaderValue(part.headers, 'content-type', part.lineBreak) || '';
+    if (/text\/html/i.test(ct)) {
+      const matches = part.body.match(/cid:([^"'>\s]+)/gi);
+      if (matches) {
+        for (const m of matches) {
+          cids.add(m.substring(4).toLowerCase());
+        }
+      }
+    }
+    return cids;
+  }
+  for (const sub of part.parts) {
+    for (const c of collectCidRefs(sub)) cids.add(c);
+  }
+  return cids;
+}
+
+function estimatePartSize(part) {
+  // Rough size estimate of the body content
+  return part.body ? part.body.length : 0;
+}
+
+function rebuildStripped(part) {
+  const cidRefs = collectCidRefs(part);
+  return rebuildPart(part, cidRefs);
+}
+
+function rebuildPart(part, cidRefs) {
+  const lb = part.lineBreak;
+
+  if (!part.parts) {
+    // Leaf part - check if it's an attachment to strip
+    const att = isAttachmentPart(part);
+    if (att) {
+      // Keep inline images referenced by HTML
+      if (att.contentId) {
+        const cid = att.contentId.replace(/^<|>$/g, '').toLowerCase();
+        if (cidRefs.has(cid)) {
+          return part.headers + lb + lb + part.body;
+        }
+      }
+      // Replace with stub
+      const size = estimatePartSize(part);
+      const stub = `[Attachment removed: ${att.filename}, ~${formatSize(size)}]`;
+      return 'Content-Type: text/plain; charset="UTF-8"' + lb +
+             'Content-Transfer-Encoding: 7bit' + lb + lb + stub;
+    }
+    // Not an attachment - keep as-is
+    return part.headers + lb + lb + part.body;
+  }
+
+  // Multipart - rebuild sub-parts
+  const boundary = part.boundary;
+  const delim = '--' + boundary;
+  const endDelim = '--' + boundary + '--';
+
+  let result = part.headers + lb + lb;
+  for (const sub of part.parts) {
+    result += delim + lb;
+    result += rebuildPart(sub, cidRefs) + lb;
+  }
+  result += endDelim + lb;
+  return result;
+}
+
+// -- Base64URL encode/decode for raw MIME --
+function b64UrlToString(b64url) {
+  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64);
+  // Decode as Latin-1 (preserves all bytes for MIME which is 7/8-bit)
+  return bin;
+}
+
+function stringToB64Url(str) {
+  const b64 = btoa(str);
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// -- Preview --
+async function openPreview(msgId) {
+  const panel = document.getElementById('preview-panel');
+  const overlay = document.getElementById('preview-overlay');
+  const body = document.getElementById('preview-body');
+  const attachEl = document.getElementById('preview-attachments');
+
+  // Show panel
+  overlay.classList.remove('hidden');
+  panel.classList.add('open');
+  body.innerHTML = '<div class="preview-loading"><span class="spinner"></span> Loading...</div>';
+  attachEl.style.display = 'none';
+
+  // Set current preview message ID and update Gmail link
+  currentPreviewMsgId = msgId;
+  const gmailLink = document.getElementById('preview-gmail-link');
+  gmailLink.href = 'https://mail.google.com/mail/u/0/#inbox/' + msgId;
+  gmailLink.style.display = '';
+
+  // Find message metadata from our list
+  const msgMeta = messages.find(m => m.id === msgId);
+  if (msgMeta) {
+    document.getElementById('preview-from').textContent = 'From: ' + msgMeta.from;
+    document.getElementById('preview-to').textContent = '';
+    document.getElementById('preview-subject').textContent = msgMeta.subject;
+    document.getElementById('preview-date').textContent = msgMeta.dateRaw;
+  }
+
+  try {
+    const resp = await gapi.client.gmail.users.messages.get({
+      userId: 'me',
+      id: msgId,
+      format: 'full',
+    });
+    const msg = resp.result;
+    // Extract To header
+    const toHeader = findHeader(msg.payload, 'To');
+    if (toHeader) {
+      document.getElementById('preview-to').textContent = 'To: ' + toHeader;
+    }
+    renderPreview(msg, body, attachEl);
+  } catch (e) {
+    body.innerHTML = '<div class="preview-loading">Failed to load: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function renderPreview(msg, bodyEl, attachEl) {
+  const payload = msg.payload;
+
+  // Collect attachments
+  const attachments = [];
+  collectAttachments(payload, attachments);
+  if (attachments.length > 0) {
+    attachEl.style.display = '';
+    attachEl.innerHTML = 'Attachments: ' + attachments
+      .map(a => `<span>${escHtml(a.filename)} (${formatSize(a.size)})</span>`)
+      .join('');
+  }
+
+  // Find HTML or plain text body
+  const htmlBody = findBodyPart(payload, 'text/html');
+  const textBody = findBodyPart(payload, 'text/plain');
+
+  if (htmlBody) {
+    const decoded = decodeBase64Url(htmlBody);
+    const iframe = document.createElement('iframe');
+    iframe.sandbox = 'allow-same-origin';
+    bodyEl.innerHTML = '';
+    bodyEl.appendChild(iframe);
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(decoded);
+    iframe.contentDocument.close();
+  } else if (textBody) {
+    const decoded = decodeBase64Url(textBody);
+    bodyEl.innerHTML = '<div class="preview-text"></div>';
+    bodyEl.querySelector('.preview-text').textContent = decoded;
+  } else {
+    bodyEl.innerHTML = '<div class="preview-loading">No displayable content</div>';
+  }
+}
+
+function findHeader(payload, name) {
+  if (payload && payload.headers) {
+    const h = payload.headers.find(h => h.name.toLowerCase() === name.toLowerCase());
+    return h ? h.value : null;
+  }
+  return null;
+}
+
+function findBodyPart(part, mimeType) {
+  if (!part) return null;
+  if (part.mimeType === mimeType && part.body && part.body.data) {
+    return part.body.data;
+  }
+  if (part.parts) {
+    for (const p of part.parts) {
+      const found = findBodyPart(p, mimeType);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function collectAttachments(part, list) {
+  if (!part) return;
+  if (part.filename && part.filename.length > 0) {
+    list.push({ filename: part.filename, size: part.body ? part.body.size || 0 : 0 });
+  }
+  if (part.parts) {
+    for (const p of part.parts) collectAttachments(p, list);
+  }
+}
+
+function decodeBase64Url(data) {
+  const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+  try {
+    return decodeURIComponent(atob(base64).split('').map(c =>
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join(''));
+  } catch (e) {
+    return atob(base64);
+  }
+}
+
+function closePreview() {
+  document.getElementById('preview-panel').classList.remove('open');
+  document.getElementById('preview-overlay').classList.add('hidden');
+  currentPreviewMsgId = null;
+  document.getElementById('preview-gmail-link').style.display = 'none';
+}
+
+// -- Utilities --
+function formatSize(bytes) {
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return bytes + ' B';
+}
+
+function formatDate(d) {
+  if (!d || d.getTime() === 0) return '?';
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 86400000 && d.getDate() === now.getDate()) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  return d.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function parseFrom(from) {
+  // "Name <email>" -> "Name", or just return as-is
+  const m = from.match(/^"?(.+?)"?\s*<.+>$/);
+  return m ? m[1] : from;
+}
+
+function escHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function escAttr(s) {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+function showProgress(pct) {
+  const bar = document.getElementById('progress-bar');
+  const fill = document.getElementById('progress-fill');
+  bar.style.display = '';
+  fill.style.width = pct + '%';
+}
+
+function hideProgress() {
+  document.getElementById('progress-bar').style.display = 'none';
+}
+
+function toast(message, type) {
+  const container = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + (type || 'info');
+  t.textContent = message;
+  container.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// Load saved credentials on page load
+window.addEventListener('load', loadCredentials);
+
+// Load Google API scripts dynamically (must be after function definitions)
+function loadScript(src, onload) {
+  const s = document.createElement('script');
+  s.src = src;
+  s.async = true;
+  s.onload = onload;
+  document.head.appendChild(s);
+}
+loadScript('https://apis.google.com/js/api.js', onGapiLoad);
+loadScript('https://accounts.google.com/gsi/client', onGisLoad);
+</script>
+
+</body>
+</html>
