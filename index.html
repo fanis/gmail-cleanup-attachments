@@ -422,18 +422,69 @@
   .preview-close:hover { color: var(--text); }
 
   .preview-attachments {
-    padding: 8px 20px;
+    padding: 12px 20px;
     border-bottom: 1px solid var(--border);
     font-size: 12px;
     color: var(--text-dim);
   }
-  .preview-attachments span {
-    display: inline-block;
+  .preview-attachments .att-label { margin-bottom: 6px; }
+  .att-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .att-item {
     background: var(--surface2);
-    padding: 2px 8px;
-    border-radius: 3px;
-    margin-right: 6px;
-    margin-bottom: 4px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 280px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .att-item:hover { border-color: var(--accent); }
+  .att-icon { font-size: 16px; flex-shrink: 0; }
+  .att-info { min-width: 0; }
+  .att-name {
+    font-size: 12px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .att-size { font-size: 11px; color: var(--text-dim); }
+  .att-thumb {
+    max-width: 200px;
+    max-height: 120px;
+    border-radius: 4px;
+    margin-top: 4px;
+    display: block;
+  }
+  .att-preview-area {
+    padding: 8px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    max-height: 300px;
+    overflow: auto;
+  }
+  .att-preview-area img {
+    max-width: 100%;
+    max-height: 280px;
+    border-radius: 4px;
+  }
+  .att-preview-area iframe {
+    width: 100%;
+    height: 260px;
+    border: none;
+    border-radius: 4px;
+    background: #fff;
+  }
+  .att-preview-area pre {
+    text-align: left;
+    font-size: 12px;
+    color: var(--text);
+    white-space: pre-wrap;
+    max-height: 260px;
+    overflow: auto;
   }
 
   .preview-body {
@@ -467,6 +518,143 @@
     text-decoration: none;
   }
   .col-subject-link:hover { color: var(--accent); text-decoration: underline; }
+
+  /* Preview strip controls */
+  .preview-strip-bar {
+    padding: 8px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+  }
+  .preview-strip-bar .spacer { flex: 1; }
+
+  .att-item input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Strip review modal */
+  .strip-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+  }
+  .strip-modal.hidden { display: none; }
+
+  .strip-modal-content {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 700px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .strip-modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .strip-modal-header h3 { font-size: 16px; }
+  .strip-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 20px;
+  }
+  .strip-modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+  .strip-modal-footer .strip-summary {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .strip-msg-group {
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .strip-msg-header {
+    padding: 10px 14px;
+    background: var(--bg);
+    font-size: 13px;
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+  .strip-msg-header .strip-msg-from {
+    color: var(--text);
+    font-weight: 500;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .strip-msg-header .strip-msg-subject {
+    color: var(--text-dim);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .strip-msg-header .strip-msg-size {
+    color: var(--warning);
+    font-family: monospace;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .strip-att-list { padding: 6px 14px 10px; }
+  .strip-att-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 13px;
+  }
+  .strip-att-row label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .strip-att-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .strip-att-size {
+    color: var(--text-dim);
+    font-family: monospace;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  footer a { color: var(--text-dim); text-decoration: none; }
+  footer a:hover { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -512,7 +700,7 @@
 <div id="app">
   <div class="toolbar" onkeydown="if(event.key==='Enter')searchMessages()">
     <label for="size-threshold">Larger than</label>
-    <input type="number" id="size-threshold" value="5" min="1" style="width:70px">
+    <input type="number" id="size-threshold" value="10" min="1" style="width:70px">
     <select id="size-unit">
       <option value="M" selected>MB</option>
       <option value="K">KB</option>
@@ -573,8 +761,14 @@
     <button class="preview-close" onclick="closePreview()">&times;</button>
   </div>
   <div class="preview-attachments" id="preview-attachments" style="display:none"></div>
+  <div class="att-preview-area" id="att-preview-area" style="display:none"></div>
   <div class="preview-body" id="preview-body">
     <div class="preview-loading">Click a subject to preview</div>
+  </div>
+  <div class="preview-strip-bar" id="preview-strip-bar" style="display:none">
+    <span id="preview-strip-count" style="font-size:13px;color:var(--text-dim)"></span>
+    <span class="spacer"></span>
+    <button class="btn btn-primary btn-small" id="btn-preview-strip" onclick="stripFromPreview()">Strip Checked</button>
   </div>
 </div>
 
@@ -589,6 +783,24 @@
     </div>
   </div>
 </div>
+
+<!-- Strip Review Modal (B) -->
+<div class="strip-modal hidden" id="strip-modal">
+  <div class="strip-modal-content">
+    <div class="strip-modal-header">
+      <h3>Review Attachments to Strip</h3>
+      <button class="preview-close" onclick="closeStripModal()">&times;</button>
+    </div>
+    <div class="strip-modal-body" id="strip-modal-body"></div>
+    <div class="strip-modal-footer">
+      <span class="strip-summary" id="strip-modal-summary"></span>
+      <button class="btn btn-secondary" onclick="closeStripModal()">Cancel</button>
+      <button class="btn btn-primary" id="btn-strip-confirm" onclick="executeSelectiveStrip()">Strip Selected</button>
+    </div>
+  </div>
+</div>
+
+<footer><a href="https://github.com/fanis/gmail-cleanup-attachments" target="_blank">gmail-cleanup-attachments</a> on GitHub</footer>
 
 <div class="toast-container" id="toast-container"></div>
 
@@ -609,6 +821,7 @@ let currentPreviewMsgId = null;
 let sessionTrashed = 0;      // count of trashed messages
 let sessionStripped = 0;     // count of stripped messages
 let sessionBytesSaved = 0;   // total bytes freed
+let lastClickedRowIdx = null; // for shift+click range selection
 
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest';
 const SCOPES = 'https://www.googleapis.com/auth/gmail.modify';
@@ -755,6 +968,9 @@ async function onAuthed() {
   } catch (e) { /* ignore - will fall back to raw IDs */ }
 
   toast('Connected to Gmail', 'success');
+
+  // Auto-search on first connect
+  searchMessages();
 }
 
 function handleSignout() {
@@ -936,8 +1152,18 @@ function renderTable() {
       .map(l => `<span class="label-tag">${escHtml(labelMap[l] || l)}</span>`)
       .join('');
 
+    const rowIdx = messages.indexOf(msg);
+    tr.dataset.msgId = msg.id;
+    tr.dataset.rowIdx = rowIdx;
+    tr.style.cursor = 'pointer';
+    tr.onclick = (e) => {
+      if (e.target.closest('.col-subject-link')) return;
+      // For checkbox clicks, let the handler below deal with it
+      if (e.target.type === 'checkbox') return;
+      handleRowClick(rowIdx, e.shiftKey);
+    };
     tr.innerHTML = `
-      <td class="col-check"><input type="checkbox" ${selectedIds.has(msg.id) ? 'checked' : ''} onchange="toggleSelect('${msg.id}', this.checked)"></td>
+      <td class="col-check"><input type="checkbox" data-row-idx="${rowIdx}" ${selectedIds.has(msg.id) ? 'checked' : ''} onclick="handleCheckboxClick(${rowIdx}, event)"></td>
       <td class="col-from" title="${escAttr(msg.from)}">${escHtml(parseFrom(msg.from))}</td>
       <td class="col-subject" title="${escAttr(msg.subject)}"><a class="col-subject-link" onclick="openPreview('${msg.id}')">${escHtml(msg.subject)}</a></td>
       <td class="col-date" title="${escAttr(msg.dateRaw)}">${formatDate(msg.date)}</td>
@@ -1012,6 +1238,63 @@ function updateSessionStats() {
 }
 
 // -- Selection --
+function handleRowClick(rowIdx, shiftKey) {
+  if (shiftKey && lastClickedRowIdx !== null) {
+    selectRange(lastClickedRowIdx, rowIdx);
+  } else {
+    const msg = messages[rowIdx];
+    if (!msg) return;
+    const checked = !selectedIds.has(msg.id);
+    toggleSelect(msg.id, checked);
+  }
+  lastClickedRowIdx = rowIdx;
+  syncCheckboxes();
+}
+
+function handleCheckboxClick(rowIdx, event) {
+  event.stopPropagation();
+  if (event.shiftKey && lastClickedRowIdx !== null) {
+    // Prevent the checkbox from toggling itself - we handle it
+    event.preventDefault();
+    selectRange(lastClickedRowIdx, rowIdx);
+  } else {
+    const msg = messages[rowIdx];
+    if (!msg) return;
+    // Checkbox already toggled by browser, read its new state
+    const cb = event.target;
+    toggleSelect(msg.id, cb.checked);
+  }
+  lastClickedRowIdx = rowIdx;
+  syncCheckboxes();
+}
+
+function selectRange(fromIdx, toIdx) {
+  const start = Math.min(fromIdx, toIdx);
+  const end = Math.max(fromIdx, toIdx);
+  for (let i = start; i <= end; i++) {
+    const msg = messages[i];
+    if (msg) selectedIds.add(msg.id);
+  }
+  renderTable();
+  updateStatus();
+}
+
+function syncCheckboxes() {
+  const rows = document.getElementById('results-body').rows;
+  for (const row of rows) {
+    const cb = row.querySelector('input[type="checkbox"]');
+    const msgId = row.dataset.msgId;
+    if (cb && msgId) {
+      cb.checked = selectedIds.has(msgId);
+      row.classList.toggle('selected', cb.checked);
+    }
+  }
+  document.getElementById('select-all').checked =
+    messages.length > 0 && messages.every(m => selectedIds.has(m.id));
+  updateStatus();
+  updateTrashButton();
+}
+
 function toggleSelect(id, checked) {
   if (checked) selectedIds.add(id);
   else selectedIds.delete(id);
@@ -1111,23 +1394,118 @@ async function executeTrash() {
   }
 }
 
-// -- Strip Attachments --
-function confirmStrip() {
-  const count = selectedIds.size;
-  document.getElementById('dialog-title').textContent = 'Strip Attachments?';
-  document.getElementById('dialog-body').textContent =
-    `This will remove attachments from ${count} message${count > 1 ? 's' : ''}, ` +
-    `keeping the email body and inline images intact. ` +
-    `A stripped copy is inserted and the original is moved to Trash (recoverable for 30 days).`;
-  const btn = document.getElementById('btn-confirm-action');
+// -- Strip Attachments (Bulk with review modal) --
+let stripReviewData = []; // [{msgId, from, subject, attachments: [{filename, size, checked}]}]
+
+async function confirmStrip() {
+  const ids = [...selectedIds];
+  const btn = document.getElementById('btn-strip');
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+
+  // Fetch full metadata for each selected message to get attachment info
+  stripReviewData = [];
+  for (const msgId of ids) {
+    try {
+      const resp = await gapi.client.gmail.users.messages.get({
+        userId: 'me', id: msgId, format: 'full',
+      });
+      const msg = resp.result;
+      const from = findHeader(msg.payload, 'From') || '?';
+      const subject = findHeader(msg.payload, 'Subject') || '(no subject)';
+      const attachments = [];
+      collectAttachments(msg.payload, attachments);
+      // Filter to real attachments only (skip inline images, etc.)
+      const strippable = attachments.filter(a => a.filename && a.size > 0);
+      if (strippable.length > 0) {
+        stripReviewData.push({
+          msgId,
+          from: parseFrom(from),
+          subject,
+          attachments: strippable.map(a => ({ filename: a.filename, size: a.size, checked: true })),
+        });
+      }
+    } catch (e) {
+      console.error('Failed to fetch', msgId, e);
+    }
+  }
+
   btn.textContent = 'Strip Attachments';
-  btn.onclick = executeStrip;
-  document.getElementById('confirm-dialog').classList.remove('hidden');
+  btn.disabled = false;
+
+  if (stripReviewData.length === 0) {
+    toast('No strippable attachments found', 'info');
+    return;
+  }
+
+  renderStripModal();
+  document.getElementById('strip-modal').classList.remove('hidden');
 }
 
-async function executeStrip() {
-  closeDialog();
-  const ids = [...selectedIds];
+function renderStripModal() {
+  const body = document.getElementById('strip-modal-body');
+  let html = '';
+
+  for (let mi = 0; mi < stripReviewData.length; mi++) {
+    const msg = stripReviewData[mi];
+    const totalSize = msg.attachments.reduce((s, a) => s + a.size, 0);
+    html += `<div class="strip-msg-group">
+      <div class="strip-msg-header">
+        <span class="strip-msg-from">${escHtml(msg.from)}</span>
+        <span class="strip-msg-subject">${escHtml(msg.subject)}</span>
+        <span class="strip-msg-size">${formatSize(totalSize)}</span>
+      </div>
+      <div class="strip-att-list">`;
+
+    for (let ai = 0; ai < msg.attachments.length; ai++) {
+      const att = msg.attachments[ai];
+      html += `<div class="strip-att-row">
+        <label>
+          <input type="checkbox" ${att.checked ? 'checked' : ''} onchange="toggleStripAtt(${mi}, ${ai}, this.checked)">
+          <span class="strip-att-name">${escHtml(att.filename)}</span>
+        </label>
+        <span class="strip-att-size">${formatSize(att.size)}</span>
+      </div>`;
+    }
+
+    html += '</div></div>';
+  }
+
+  body.innerHTML = html;
+  updateStripModalSummary();
+}
+
+function toggleStripAtt(msgIdx, attIdx, checked) {
+  stripReviewData[msgIdx].attachments[attIdx].checked = checked;
+  updateStripModalSummary();
+}
+
+function updateStripModalSummary() {
+  let totalFiles = 0;
+  let totalSize = 0;
+  let msgCount = 0;
+
+  for (const msg of stripReviewData) {
+    const checked = msg.attachments.filter(a => a.checked);
+    if (checked.length > 0) {
+      msgCount++;
+      totalFiles += checked.length;
+      totalSize += checked.reduce((s, a) => s + a.size, 0);
+    }
+  }
+
+  const summary = document.getElementById('strip-modal-summary');
+  summary.textContent = `${totalFiles} attachment${totalFiles !== 1 ? 's' : ''} from ${msgCount} message${msgCount !== 1 ? 's' : ''} (${formatSize(totalSize)})`;
+  document.getElementById('btn-strip-confirm').disabled = totalFiles === 0;
+}
+
+function closeStripModal() {
+  document.getElementById('strip-modal').classList.remove('hidden');
+  document.getElementById('strip-modal').classList.add('hidden');
+}
+
+async function executeSelectiveStrip() {
+  closeStripModal();
   const btn = document.getElementById('btn-strip');
   btn.disabled = true;
   btn.textContent = 'Stripping...';
@@ -1137,17 +1515,28 @@ async function executeStrip() {
   let errors = 0;
   let totalSaved = 0;
 
-  for (let i = 0; i < ids.length; i++) {
-    const msgId = ids[i];
+  // Build per-message file sets
+  const jobs = [];
+  for (const msg of stripReviewData) {
+    const checked = msg.attachments.filter(a => a.checked);
+    if (checked.length === 0) continue;
+    const allChecked = checked.length === msg.attachments.length;
+    jobs.push({
+      msgId: msg.msgId,
+      filesToStrip: allChecked ? null : new Set(checked.map(a => a.filename)),
+    });
+  }
+
+  for (let i = 0; i < jobs.length; i++) {
     try {
-      const saved = await stripOneMessage(msgId);
+      const saved = await stripOneMessage(jobs[i].msgId, jobs[i].filesToStrip);
       totalSaved += saved;
       done++;
     } catch (e) {
-      console.error('Strip failed for', msgId, e);
+      console.error('Strip failed for', jobs[i].msgId, e);
       errors++;
     }
-    showProgress(Math.round(((i + 1) / ids.length) * 100));
+    showProgress(Math.round(((i + 1) / jobs.length) * 100));
   }
 
   // Update session stats
@@ -1155,10 +1544,10 @@ async function executeStrip() {
   sessionBytesSaved += totalSaved;
   updateSessionStats();
 
-  // Remove processed messages from the list
-  const processedSet = new Set(ids);
-  messages = messages.filter(m => !processedSet.has(m.id));
-  selectedIds.clear();
+  // Remove processed messages from list
+  const processedIds = new Set(jobs.map(j => j.msgId));
+  messages = messages.filter(m => !processedIds.has(m.id));
+  selectedIds = new Set([...selectedIds].filter(id => !processedIds.has(id)));
   renderTable();
   updateStatus();
   hideProgress();
@@ -1173,7 +1562,8 @@ async function executeStrip() {
   }
 }
 
-async function stripOneMessage(msgId) {
+// filesToStrip: null = all, Set of filenames = selective
+async function stripOneMessage(msgId, filesToStrip) {
   // 1. Get metadata (labels, threadId)
   const metaResp = await gapi.client.gmail.users.messages.get({
     userId: 'me', id: msgId, format: 'metadata',
@@ -1192,11 +1582,10 @@ async function stripOneMessage(msgId) {
   const originalSize = rawStr.length;
 
   // 3. Parse and strip attachments
-  const stripped = stripMimeAttachments(rawStr);
+  const stripped = stripMimeAttachments(rawStr, filesToStrip);
   const strippedSize = stripped.length;
 
   if (stripped === rawStr) {
-    // Nothing was stripped
     return 0;
   }
 
@@ -1219,10 +1608,10 @@ async function stripOneMessage(msgId) {
 }
 
 // -- MIME Parsing & Stripping --
-function stripMimeAttachments(mimeStr) {
-  // Find the top-level Content-Type and boundary
+// filesToStrip: null = strip all, Set of filenames = strip only those
+function stripMimeAttachments(mimeStr, filesToStrip) {
   const parsed = parseMimePart(mimeStr);
-  const rebuilt = rebuildStripped(parsed);
+  const rebuilt = rebuildStripped(parsed, filesToStrip);
   return rebuilt;
 }
 
@@ -1370,12 +1759,12 @@ function estimatePartSize(part) {
   return part.body ? part.body.length : 0;
 }
 
-function rebuildStripped(part) {
+function rebuildStripped(part, filesToStrip) {
   const cidRefs = collectCidRefs(part);
-  return rebuildPart(part, cidRefs);
+  return rebuildPart(part, cidRefs, filesToStrip);
 }
 
-function rebuildPart(part, cidRefs) {
+function rebuildPart(part, cidRefs, filesToStrip) {
   const lb = part.lineBreak;
 
   if (!part.parts) {
@@ -1388,6 +1777,10 @@ function rebuildPart(part, cidRefs) {
         if (cidRefs.has(cid)) {
           return part.headers + lb + lb + part.body;
         }
+      }
+      // If selective mode, only strip if filename is in the set
+      if (filesToStrip && !filesToStrip.has(att.filename)) {
+        return part.headers + lb + lb + part.body;
       }
       // Replace with stub
       const size = estimatePartSize(part);
@@ -1407,7 +1800,7 @@ function rebuildPart(part, cidRefs) {
   let result = part.headers + lb + lb;
   for (const sub of part.parts) {
     result += delim + lb;
-    result += rebuildPart(sub, cidRefs) + lb;
+    result += rebuildPart(sub, cidRefs, filesToStrip) + lb;
   }
   result += endDelim + lb;
   return result;
@@ -1472,17 +1865,190 @@ async function openPreview(msgId) {
   }
 }
 
+function attIcon(mimeType) {
+  if (/^image\//.test(mimeType)) return '&#x1f5bc;';
+  if (/pdf/.test(mimeType)) return '&#x1f4c4;';
+  if (/text\//.test(mimeType)) return '&#x1f4dd;';
+  if (/zip|archive|compressed/.test(mimeType)) return '&#x1f4e6;';
+  if (/audio\//.test(mimeType)) return '&#x1f3b5;';
+  if (/video\//.test(mimeType)) return '&#x1f3ac;';
+  return '&#x1f4ce;';
+}
+
+function isPreviewable(mimeType) {
+  return /^image\/(jpeg|jpg|png|gif|webp|svg)/i.test(mimeType) || /^text\//i.test(mimeType);
+}
+
+async function fetchAttachmentData(msgId, attachmentId) {
+  const resp = await gapi.client.gmail.users.messages.attachments.get({
+    userId: 'me', messageId: msgId, id: attachmentId,
+  });
+  return resp.result.data;
+}
+
+function b64UrlToBlob(b64url, mimeType) {
+  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mimeType });
+}
+
+function downloadAttachment(b64url, mimeType, filename) {
+  const blob = b64UrlToBlob(b64url, mimeType);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+let previewAttachments = []; // current preview's attachment list
+let previewMsgFull = null;   // full message object for current preview
+
+async function previewAttachment(msgId, att, attEl) {
+  const previewArea = document.getElementById('att-preview-area');
+  previewArea.style.display = '';
+  previewArea.innerHTML = '<span class="spinner"></span> Loading...';
+
+  // Highlight active attachment
+  document.querySelectorAll('.att-item').forEach(el => el.style.borderColor = '');
+  if (attEl) attEl.style.borderColor = 'var(--accent)';
+
+  try {
+    let data = att.inlineData;
+    if (!data && att.attachmentId) {
+      data = await fetchAttachmentData(msgId, att.attachmentId);
+    }
+    if (!data) {
+      previewArea.innerHTML = 'No data available';
+      return;
+    }
+
+    if (/^image\//i.test(att.mimeType)) {
+      const blob = b64UrlToBlob(data, att.mimeType);
+      const url = URL.createObjectURL(blob);
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = att.filename;
+      previewArea.innerHTML = '';
+      previewArea.appendChild(img);
+    } else if (/^text\//i.test(att.mimeType)) {
+      const text = decodeBase64Url(data);
+      previewArea.innerHTML = '';
+      const pre = document.createElement('pre');
+      pre.textContent = text;
+      previewArea.appendChild(pre);
+    }
+  } catch (e) {
+    previewArea.innerHTML = 'Failed to load: ' + escHtml(e.message);
+  }
+}
+
+function updatePreviewStripBar() {
+  const bar = document.getElementById('preview-strip-bar');
+  const count = document.getElementById('preview-strip-count');
+  const btn = document.getElementById('btn-preview-strip');
+  const checked = document.querySelectorAll('#preview-attachments .att-check:checked');
+  const total = document.querySelectorAll('#preview-attachments .att-check');
+
+  if (total.length === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+
+  bar.style.display = '';
+  const checkedSize = [...checked].reduce((sum, cb) => {
+    const idx = parseInt(cb.dataset.attIdx, 10);
+    return sum + (previewAttachments[idx]?.size || 0);
+  }, 0);
+  count.textContent = `${checked.length} of ${total.length} selected (${formatSize(checkedSize)})`;
+  btn.disabled = checked.length === 0;
+}
+
+async function stripFromPreview() {
+  const checked = document.querySelectorAll('#preview-attachments .att-check:checked');
+  if (checked.length === 0) return;
+
+  const filesToStrip = new Set();
+  for (const cb of checked) {
+    const idx = parseInt(cb.dataset.attIdx, 10);
+    if (previewAttachments[idx]) filesToStrip.add(previewAttachments[idx].filename);
+  }
+
+  const btn = document.getElementById('btn-preview-strip');
+  btn.disabled = true;
+  btn.textContent = 'Stripping...';
+
+  try {
+    const saved = await stripOneMessage(currentPreviewMsgId, filesToStrip);
+    sessionStripped += 1;
+    sessionBytesSaved += saved;
+    updateSessionStats();
+
+    // Remove from main list
+    messages = messages.filter(m => m.id !== currentPreviewMsgId);
+    selectedIds.delete(currentPreviewMsgId);
+    renderTable();
+    updateStatus();
+    closePreview();
+    toast(`Stripped ${filesToStrip.size} attachment${filesToStrip.size > 1 ? 's' : ''}. Saved ${formatSize(saved)}`, 'success');
+  } catch (e) {
+    toast('Strip failed: ' + e.message, 'error');
+  }
+
+  btn.textContent = 'Strip Checked';
+  btn.disabled = false;
+}
+
 function renderPreview(msg, bodyEl, attachEl) {
   const payload = msg.payload;
+  const previewArea = document.getElementById('att-preview-area');
+  previewArea.style.display = 'none';
+  previewMsgFull = msg;
 
   // Collect attachments
-  const attachments = [];
-  collectAttachments(payload, attachments);
-  if (attachments.length > 0) {
+  previewAttachments = [];
+  collectAttachments(payload, previewAttachments);
+  if (previewAttachments.length > 0) {
     attachEl.style.display = '';
-    attachEl.innerHTML = 'Attachments: ' + attachments
-      .map(a => `<span>${escHtml(a.filename)} (${formatSize(a.size)})</span>`)
-      .join('');
+    const items = previewAttachments.map((a, i) => {
+      const previewable = isPreviewable(a.mimeType);
+      return `<div class="att-item" data-att-idx="${i}" title="${previewable ? 'Click to preview' : 'Click to download'}">
+        <input type="checkbox" class="att-check" data-att-idx="${i}" checked onclick="event.stopPropagation(); updatePreviewStripBar()">
+        <span class="att-icon">${attIcon(a.mimeType)}</span>
+        <div class="att-info">
+          <div class="att-name">${escHtml(a.filename)}</div>
+          <div class="att-size">${formatSize(a.size)}</div>
+        </div>
+      </div>`;
+    }).join('');
+    attachEl.innerHTML = `<div class="att-label">Attachments (${previewAttachments.length}):</div><div class="att-list">${items}</div>`;
+
+    // Bind click handlers (preview/download on click, not on checkbox)
+    attachEl.querySelectorAll('.att-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        if (e.target.type === 'checkbox') return;
+        const idx = parseInt(el.dataset.attIdx, 10);
+        const att = previewAttachments[idx];
+        if (isPreviewable(att.mimeType)) {
+          previewAttachment(msg.id, att, el);
+        } else {
+          (async () => {
+            let data = att.inlineData;
+            if (!data && att.attachmentId) {
+              data = await fetchAttachmentData(msg.id, att.attachmentId);
+            }
+            if (data) downloadAttachment(data, att.mimeType, att.filename);
+          })();
+        }
+      });
+    });
+
+    updatePreviewStripBar();
+  } else {
+    document.getElementById('preview-strip-bar').style.display = 'none';
   }
 
   // Find HTML or plain text body
@@ -1532,7 +2098,13 @@ function findBodyPart(part, mimeType) {
 function collectAttachments(part, list) {
   if (!part) return;
   if (part.filename && part.filename.length > 0) {
-    list.push({ filename: part.filename, size: part.body ? part.body.size || 0 : 0 });
+    list.push({
+      filename: part.filename,
+      size: part.body ? part.body.size || 0 : 0,
+      mimeType: part.mimeType || '',
+      attachmentId: part.body ? part.body.attachmentId || null : null,
+      inlineData: part.body ? part.body.data || null : null,
+    });
   }
   if (part.parts) {
     for (const p of part.parts) collectAttachments(p, list);
@@ -1553,9 +2125,20 @@ function decodeBase64Url(data) {
 function closePreview() {
   document.getElementById('preview-panel').classList.remove('open');
   document.getElementById('preview-overlay').classList.add('hidden');
+  document.getElementById('att-preview-area').style.display = 'none';
   currentPreviewMsgId = null;
   document.getElementById('preview-gmail-link').style.display = 'none';
 }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (!document.getElementById('strip-modal').classList.contains('hidden')) {
+      closeStripModal();
+    } else if (currentPreviewMsgId) {
+      closePreview();
+    }
+  }
+});
 
 // -- Utilities --
 function formatSize(bytes) {
