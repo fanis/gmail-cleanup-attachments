@@ -40,11 +40,9 @@ You need a Google Cloud project with the Gmail API enabled and OAuth credentials
 
 The file must be served over HTTP - Google OAuth won't work from a `file://` URL. Pick any port and use it consistently with the JavaScript origin you set up above.
 
-```bash
-python -m http.server 9123
-# or: npx serve -p 9123
-# or: php -S localhost:9123
-```
+**Windows:** double-click `start.bat`. **Linux/macOS:** run `./start.sh`.
+
+Both scripts auto-detect Python or Node.js, start a local server on port 9123, and open your browser. No dependencies to install beyond one of those two.
 
 Open `http://localhost:9123` in your browser, enter your Client ID and API Key, click Connect. The app auto-searches for large emails on first connect.
 
