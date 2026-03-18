@@ -8,13 +8,18 @@ Single-file, client-side web app for cleaning up Gmail. Find large emails, previ
 
 ## Features
 
-- Search by size with Gmail query filters (`larger:5M`, `has:attachment`, `older_than:1y`, etc.)
-- Sortable results by sender, subject, date, or size
-- Email preview - click any subject to see the full rendered email with headers and attachment list
-- Bulk trash
-- Strip attachments - removes attachments while keeping the email body, inline images, labels, threading, and read/unread state. Originals go to Trash (recoverable for 30 days).
-- Session stats showing how many emails processed and space freed
-- OAuth token cached in localStorage so you don't re-authenticate on every page load
+- **Search** by size with Gmail query filters (`larger:10M`, `has:attachment`, `older_than:1y`, etc.). Auto-searches on connect.
+- **Sortable results** by sender, subject, date, or size
+- **Shift+click** to select a range of rows
+- **Email preview** - click any subject to see the full rendered email with From, To, Date headers, a link to open in Gmail, and inline attachment previews (images, text)
+- **Attachment preview** - click an attachment to preview images and text files inline, or download other types. Previewed attachment gets a highlighted border.
+- **Bulk trash** - select and trash multiple emails at once
+- **Selective attachment stripping** - two ways:
+  - **From the preview panel**: each attachment has a checkbox. Uncheck the ones you want to keep, click "Strip Checked" to strip only the selected attachments from that email.
+  - **From the toolbar**: select emails, click "Strip Attachments". A review modal shows every email with its attachments listed individually. Uncheck any attachment you want to keep across all selected emails, then confirm.
+- **Safe**: originals go to Trash (recoverable for 30 days). Inline images referenced by the HTML body are preserved. Removed attachments are replaced with a text stub noting filename and size.
+- **Session stats** in the header showing emails processed and space freed
+- **Persistent auth** - OAuth token cached in localStorage, no re-authentication on page reload
 
 ## Setup
 
@@ -39,22 +44,37 @@ python -m http.server 9123
 # or: php -S localhost:9123
 ```
 
-Open `http://localhost:9123` in your browser, enter your Client ID and API Key, click Connect.
+Open `http://localhost:9123` in your browser, enter your Client ID and API Key, click Connect. The app auto-searches for large emails on first connect.
+
+### Browsing and selecting
+
+- Set the size threshold and optionally add Gmail search filters, press Enter or click Search
+- Click any row to toggle selection, or use the checkbox
+- Shift+click to select a range of rows between the last clicked and current
+- Click a subject to open the preview panel (Esc to close)
+
+### Trashing emails
+
+Select emails, click **Trash Selected**. Emails move to Gmail Trash (auto-deleted after 30 days).
 
 ### Stripping attachments
 
-Select emails and click **Strip Attachments**. For each email:
+**Bulk (from toolbar):** Select emails, click **Strip Attachments**. A review modal lists every selected email with its attachments. Each attachment has a checkbox (all checked by default). Uncheck any you want to keep, then confirm. Shows total count and size of what will be stripped.
+
+**Per-email (from preview):** Open an email preview, check/uncheck individual attachments, click **Strip Checked** at the bottom of the panel.
+
+For each email, the stripping process:
 
 1. Downloads the raw MIME message
 2. Parses the MIME structure, identifies attachment parts
 3. Keeps inline images referenced by the HTML body (`cid:` references)
-4. Replaces attachments with a text stub: `[Attachment removed: filename.pdf, ~2.5 MB]`
+4. Replaces selected attachments with a text stub: `[Attachment removed: filename.pdf, ~2.5 MB]`
 5. Re-inserts the stripped email with original labels, thread, and read/unread state
 6. Moves the original to Trash
 
 ## How it works
 
-Single HTML file with inline CSS and JavaScript. Uses [Google Identity Services](https://developers.google.com/identity/gsi/web) for OAuth and [gapi](https://github.com/google/google-api-javascript-client) for Gmail API calls (`messages.list`, `messages.get`, `messages.insert`, `messages.trash`). No other dependencies.
+Single HTML file with inline CSS and JavaScript. Uses [Google Identity Services](https://developers.google.com/identity/gsi/web) for OAuth and [gapi](https://github.com/google/google-api-javascript-client) for Gmail API calls (`messages.list`, `messages.get`, `messages.insert`, `messages.trash`, `messages.attachments.get`). No other dependencies.
 
 ## Privacy
 
