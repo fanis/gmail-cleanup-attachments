@@ -1478,7 +1478,7 @@ async function executeTrash() {
 }
 
 // -- Strip Attachments (Bulk with review modal) --
-let stripReviewData = []; // [{msgId, from, subject, attachments: [{filename, size, checked}]}]
+let stripReviewData = []; // Attachments retain Gmail part IDs through review and execution.
 
 async function confirmStrip() {
   const ids = [...selectedIds];
@@ -1507,7 +1507,7 @@ async function confirmStrip() {
           from: parseFrom(from),
           subject,
           date,
-          attachments: strippable.map(a => ({ filename: a.filename, size: a.size, checked: true })),
+          attachments: strippable.map(a => ({ ...a, checked: true })),
         });
       }
     } catch (e) {
@@ -1600,24 +1600,25 @@ async function executeSelectiveStrip() {
   let done = 0;
   let errors = 0;
   let totalSaved = 0;
+  const processedIds = new Set();
 
-  // Build per-message file sets
+  // Keep explicit part IDs even when every visible attachment is checked.
   const jobs = [];
   for (const msg of stripReviewData) {
     const checked = msg.attachments.filter(a => a.checked);
     if (checked.length === 0) continue;
-    const allChecked = checked.length === msg.attachments.length;
     jobs.push({
       msgId: msg.msgId,
-      filesToStrip: allChecked ? null : new Set(checked.map(a => a.filename)),
+      partIdsToStrip: new Set(checked.map(a => a.partId)),
     });
   }
 
   for (let i = 0; i < jobs.length; i++) {
     try {
-      const saved = await stripOneMessage(jobs[i].msgId, jobs[i].filesToStrip);
+      const saved = await stripOneMessage(jobs[i].msgId, jobs[i].partIdsToStrip);
       totalSaved += saved;
       done++;
+      processedIds.add(jobs[i].msgId);
     } catch (e) {
       console.error('Strip failed for', jobs[i].msgId, e);
       errors++;
@@ -1631,7 +1632,6 @@ async function executeSelectiveStrip() {
   updateSessionStats();
 
   // Remove processed messages from list
-  const processedIds = new Set(jobs.map(j => j.msgId));
   messages = messages.filter(m => !processedIds.has(m.id));
   selectedIds = new Set([...selectedIds].filter(id => !processedIds.has(id)));
   for (const id of processedIds) selectedMeta.delete(id);
@@ -1649,12 +1649,10 @@ async function executeSelectiveStrip() {
   }
 }
 
-// filesToStrip: null = all, Set of filenames = selective
-async function stripOneMessage(msgId, filesToStrip) {
-  // 1. Get metadata (labels, threadId)
+async function stripOneMessage(msgId, partIdsToStrip) {
+  // 1. Get labels, thread ID, and Gmail's MIME tree to validate part identity.
   const metaResp = await gapi.client.gmail.users.messages.get({
-    userId: 'me', id: msgId, format: 'metadata',
-    metadataHeaders: ['From', 'To', 'Subject', 'Date'],
+    userId: 'me', id: msgId, format: 'full',
   });
   const meta = metaResp.result;
   const labelIds = meta.labelIds || [];
@@ -1669,7 +1667,7 @@ async function stripOneMessage(msgId, filesToStrip) {
   const originalSize = rawStr.length;
 
   // 3. Parse and strip attachments
-  const stripped = stripMimeAttachments(rawStr, filesToStrip);
+  const stripped = stripMimeAttachments(rawStr, partIdsToStrip, meta.payload);
   const strippedSize = stripped.length;
 
   if (stripped === rawStr) {
@@ -1695,11 +1693,20 @@ async function stripOneMessage(msgId, filesToStrip) {
 }
 
 // -- MIME Parsing & Stripping --
-// filesToStrip: null = strip all, Set of filenames = strip only those
-function stripMimeAttachments(mimeStr, filesToStrip) {
+// Selection always uses explicit Gmail part IDs, never filenames or an implicit "all".
+function stripMimeAttachments(mimeStr, partIdsToStrip, gmailPayload) {
+  if (!(partIdsToStrip instanceof Set)) throw new Error('Missing attachment selection.');
   const parsed = parseMimePart(mimeStr);
-  const rebuilt = rebuildStripped(parsed, filesToStrip);
-  return rebuilt;
+  const partsById = new Map();
+  matchGmailParts(parsed, gmailPayload, partsById);
+  for (const id of partIdsToStrip) {
+    const part = partsById.get(id);
+    if (!part || part === parsed || !part.attachmentName || part.parts) {
+      throw new Error('Cannot safely match a selected attachment. The original email was not changed.');
+    }
+  }
+  if (partIdsToStrip.size === 0) return mimeStr;
+  return rebuildPart(parsed, collectCidRefs(parsed), partIdsToStrip);
 }
 
 function parseMimePart(raw) {
@@ -1717,7 +1724,7 @@ function parseMimePart(raw) {
     bodyStart = splitIdxLF + 2;
     lineBreak = '\n';
   } else {
-    return { headers: raw, body: '', parts: null, boundary: null, lineBreak: '\r\n', raw: raw };
+    throw new Error('Cannot parse MIME headers. The original email was not changed.');
   }
 
   const headers = raw.substring(0, headerEnd);
@@ -1725,19 +1732,21 @@ function parseMimePart(raw) {
 
   // Check if multipart
   const ctMatch = getHeaderValue(headers, 'content-type', lineBreak);
-  const boundary = ctMatch ? extractBoundary(ctMatch) : null;
+  const multipart = /^multipart\//i.test(ctMatch || '');
+  const boundary = multipart ? extractBoundary(ctMatch) : null;
 
   let parts = null;
-  if (boundary) {
-    parts = splitByBoundary(body, boundary, lineBreak);
+  if (multipart) {
+    if (!boundary) throw new Error('Missing MIME boundary. The original email was not changed.');
+    parts = splitByBoundary(body, boundary);
   }
 
-  return { headers, body, parts, boundary, lineBreak, raw };
+  return { headers, body, parts, boundary, lineBreak, raw, bodyStart };
 }
 
 function getHeaderValue(headers, name, lineBreak) {
   // Handle folded headers (continuation lines starting with whitespace)
-  const lines = headers.split(lineBreak || '\r\n');
+  const lines = headers.split(/\r?\n/);
   let result = null;
   const nameLower = name.toLowerCase();
 
@@ -1763,62 +1772,92 @@ function getHeaderValue(headers, name, lineBreak) {
 }
 
 function extractBoundary(contentType) {
-  const m = contentType.match(/boundary\s*=\s*"?([^";\s]+)"?/i);
-  return m ? m[1] : null;
+  return getMimeParameter(contentType, 'boundary');
 }
 
-function splitByBoundary(body, boundary, lineBreak) {
-  const delim = '--' + boundary;
-  const endDelim = '--' + boundary + '--';
+function getMimeParameter(value, name) {
+  const pattern = new RegExp('(?:^|;)\\s*' + name + '\\s*=\\s*(?:"((?:[^"\\\\]|\\\\.)*)"|([^;\\s]+))', 'i');
+  const match = pattern.exec(value || '');
+  return match ? (match[1] !== undefined ? match[1].replace(/\\(.)/g, '$1') : match[2]) : null;
+}
 
-  // Find all parts between delimiters
+function splitByBoundary(body, boundary) {
+  // A boundary is a complete line. Retain offsets so unchanged bytes, including
+  // preamble, epilogue and delimiter whitespace, survive the rewrite exactly.
+  const escaped = boundary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const delimiters = [...body.matchAll(new RegExp('^--' + escaped + '(--)?[ \\t]*(?:\\r?\\n|$)', 'gm'))];
   const parts = [];
-  let idx = body.indexOf(delim);
-  if (idx < 0) return null;
-
-  while (true) {
-    // Move past the delimiter line
-    let lineEnd = body.indexOf(lineBreak, idx);
-    if (lineEnd < 0) break;
-    const partStart = lineEnd + lineBreak.length;
-
-    // Find next delimiter
-    const nextDelim = body.indexOf(delim, partStart);
-    if (nextDelim < 0) break;
-
-    // Part content is between partStart and nextDelim (minus trailing linebreak)
-    let partEnd = nextDelim;
-    if (body.substring(partEnd - lineBreak.length, partEnd) === lineBreak) {
-      partEnd -= lineBreak.length;
+  for (let i = 0; i < delimiters.length; i++) {
+    const current = delimiters[i];
+    if (current[1]) {
+      if (parts.length === 0) break;
+      return parts;
     }
-
-    const partRaw = body.substring(partStart, partEnd);
-    parts.push(parseMimePart(partRaw));
-
-    // Check if this is the closing delimiter
-    if (body.substring(nextDelim, nextDelim + endDelim.length) === endDelim) {
-      break;
-    }
-    idx = nextDelim;
+    const next = delimiters[i + 1];
+    if (!next) break;
+    const start = current.index + current[0].length;
+    let end = next.index;
+    if (body.slice(end - 2, end) === '\r\n') end -= 2;
+    else if (body[end - 1] === '\n') end--;
+    if (end < start) throw new Error('Empty MIME part. The original email was not changed.');
+    parts.push({ ...parseMimePart(body.slice(start, end)), start, end });
   }
-
-  return parts;
+  throw new Error('Incomplete MIME boundaries. The original email was not changed.');
 }
 
-function isAttachmentPart(part) {
-  const disp = getHeaderValue(part.headers, 'content-disposition', part.lineBreak) || '';
-  const ct = getHeaderValue(part.headers, 'content-type', part.lineBreak) || '';
-  const filename = disp.match(/filename\s*=\s*"?([^";\n]+)/i) || ct.match(/name\s*=\s*"?([^";\n]+)/i);
-
-  if (!filename && !/attachment/i.test(disp)) {
-    return null; // Not an attachment
+function matchGmailParts(part, payload, partsById) {
+  const mimeType = (getHeaderValue(part.headers, 'content-type') || 'text/plain').split(';')[0].trim().toLowerCase();
+  const children = part.parts || [];
+  const gmailChildren = payload?.parts || [];
+  if (!payload || typeof payload.partId !== 'string' || partsById.has(payload.partId) ||
+      mimeType !== (payload.mimeType || '').toLowerCase() || children.length !== gmailChildren.length) {
+    throw new Error('Gmail and raw MIME structures do not match. The original email was not changed.');
   }
+  // Gmail IDs are opaque. Map by validated structure and identity headers,
+  // rather than assuming that an ID is a MIME path or matching by filename.
+  const unfold = value => (value || '').replace(/\r?\n[ \t]+/g, ' ').trim();
+  for (const name of ['Content-Type', 'Content-Disposition', 'Content-ID', 'Content-Transfer-Encoding']) {
+    if (unfold(getHeaderValue(part.headers, name)) !== unfold(findHeader(payload, name))) {
+      throw new Error('Gmail and raw MIME headers do not match. The original email was not changed.');
+    }
+  }
+  part.partId = payload.partId;
+  part.attachmentName = payload.filename || '';
+  partsById.set(part.partId, part);
+  children.forEach((child, i) => matchGmailParts(child, gmailChildren[i], partsById));
+}
 
-  return {
-    filename: filename ? filename[1].trim() : '(unnamed)',
-    isInline: /inline/i.test(disp),
-    contentId: getHeaderValue(part.headers, 'content-id', part.lineBreak),
-  };
+function decodeMimeText(part) {
+  const encoding = (getHeaderValue(part.headers, 'content-transfer-encoding') || '7bit').trim().toLowerCase();
+  let bytes = part.body;
+  if (encoding === 'base64') {
+    bytes = atob(bytes.replace(/[ \t\r\n]/g, ''));
+  } else if (encoding === 'quoted-printable') {
+    bytes = bytes.replace(/=\r?\n/g, '');
+    if (/=(?![0-9a-f]{2})/i.test(bytes)) throw new Error('Invalid quoted-printable HTML. The original email was not changed.');
+    bytes = bytes.replace(/=([0-9a-f]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+  } else if (!['7bit', '8bit', 'binary'].includes(encoding)) {
+    throw new Error('Unsupported HTML transfer encoding. The original email was not changed.');
+  }
+  const charset = getMimeParameter(getHeaderValue(part.headers, 'content-type'), 'charset') || 'utf-8';
+  return new TextDecoder(charset, { fatal: true }).decode(Uint8Array.from(bytes, c => c.charCodeAt(0)));
+}
+
+function decodeCidEntities(value) {
+  const named = { amp: '&', quot: '"', apos: "'", lt: '<', gt: '>', colon: ':',
+    lpar: '(', rpar: ')', commat: '@', period: '.', sol: '/', percnt: '%', num: '#',
+    lowbar: '_', quest: '?', equals: '=', Tab: '\t', NewLine: '\n' };
+  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]+);/gi, (entity, name) => {
+    if (name[0] === '#') {
+      const code = /^#x/i.test(name) ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+      return code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : entity;
+    }
+    return named[name] ?? entity;
+  });
+}
+
+function normalizeContentId(value) {
+  return value.trim().replace(/^<|>$/g, '').toLowerCase();
 }
 
 function collectCidRefs(part) {
@@ -1826,10 +1865,18 @@ function collectCidRefs(part) {
   if (!part.parts) {
     const ct = getHeaderValue(part.headers, 'content-type', part.lineBreak) || '';
     if (/text\/html/i.test(ct)) {
-      const matches = part.body.match(/cid:([^"'>\s]+)/gi);
-      if (matches) {
-        for (const m of matches) {
-          cids.add(m.substring(4).toLowerCase());
+      const html = decodeCidEntities(decodeMimeText(part));
+      for (const match of html.matchAll(/cid:([^"'<>\s]+)/gi)) {
+        // Unknown entities or CSS escapes make matching uncertain. Stop rather
+        // than remove an image whose reference cannot be resolved safely.
+        if (/&(?:#\w*|[a-z][a-z0-9]+);?|\\/i.test(match[1])) {
+          throw new Error('Unsupported inline image reference. The original email was not changed.');
+        }
+        cids.add(normalizeContentId(decodeURIComponent(match[1])));
+        // Unquoted CSS url(cid:...) ends at ')'. Also retain the full value
+        // because a quoted HTML URL can contain a literal parenthesis.
+        if (match[1].includes(')')) {
+          cids.add(normalizeContentId(decodeURIComponent(match[1].split(')')[0])));
         }
       }
     }
@@ -1846,50 +1893,36 @@ function estimatePartSize(part) {
   return part.body ? part.body.length : 0;
 }
 
-function rebuildStripped(part, filesToStrip) {
-  const cidRefs = collectCidRefs(part);
-  return rebuildPart(part, cidRefs, filesToStrip);
-}
-
-function rebuildPart(part, cidRefs, filesToStrip) {
+function rebuildPart(part, cidRefs, partIdsToStrip) {
   const lb = part.lineBreak;
 
   if (!part.parts) {
-    // Leaf part - check if it's an attachment to strip
-    const att = isAttachmentPart(part);
-    if (att) {
+    if (partIdsToStrip.has(part.partId)) {
       // Keep inline images referenced by HTML
-      if (att.contentId) {
-        const cid = att.contentId.replace(/^<|>$/g, '').toLowerCase();
+      const contentId = getHeaderValue(part.headers, 'content-id');
+      if (contentId) {
+        const cid = normalizeContentId(contentId);
         if (cidRefs.has(cid)) {
-          return part.headers + lb + lb + part.body;
+          return part.raw;
         }
-      }
-      // If selective mode, only strip if filename is in the set
-      if (filesToStrip && !filesToStrip.has(att.filename)) {
-        return part.headers + lb + lb + part.body;
       }
       // Replace with stub
       const size = estimatePartSize(part);
-      const stub = `[Attachment removed: ${att.filename}, ~${formatSize(size)}]`;
+      const stub = `[Attachment removed: ${part.attachmentName}, ~${formatSize(size)}]`;
+      const encodedStub = btoa(Array.from(new TextEncoder().encode(stub), byte => String.fromCharCode(byte)).join(''));
       return 'Content-Type: text/plain; charset="UTF-8"' + lb +
-             'Content-Transfer-Encoding: 7bit' + lb + lb + stub;
+             'Content-Transfer-Encoding: base64' + lb + lb + encodedStub.match(/.{1,76}/g).join(lb);
     }
-    // Not an attachment - keep as-is
-    return part.headers + lb + lb + part.body;
+    return part.raw;
   }
 
-  // Multipart - rebuild sub-parts
-  const boundary = part.boundary;
-  const delim = '--' + boundary;
-  const endDelim = '--' + boundary + '--';
-
-  let result = part.headers + lb + lb;
+  let result = part.raw.slice(0, part.bodyStart);
+  let cursor = 0;
   for (const sub of part.parts) {
-    result += delim + lb;
-    result += rebuildPart(sub, cidRefs, filesToStrip) + lb;
+    result += part.body.slice(cursor, sub.start) + rebuildPart(sub, cidRefs, partIdsToStrip);
+    cursor = sub.end;
   }
-  result += endDelim + lb;
+  result += part.body.slice(cursor);
   return result;
 }
 
@@ -2058,10 +2091,10 @@ async function stripFromPreview() {
   const checked = document.querySelectorAll('#preview-attachments .att-check:checked');
   if (checked.length === 0) return;
 
-  const filesToStrip = new Set();
+  const partIdsToStrip = new Set();
   for (const cb of checked) {
     const idx = parseInt(cb.dataset.attIdx, 10);
-    if (previewAttachments[idx]) filesToStrip.add(previewAttachments[idx].filename);
+    if (previewAttachments[idx]) partIdsToStrip.add(previewAttachments[idx].partId);
   }
 
   const btn = document.getElementById('btn-preview-strip');
@@ -2069,7 +2102,7 @@ async function stripFromPreview() {
   btn.textContent = 'Stripping...';
 
   try {
-    const saved = await stripOneMessage(currentPreviewMsgId, filesToStrip);
+    const saved = await stripOneMessage(currentPreviewMsgId, partIdsToStrip);
     sessionStripped += 1;
     sessionBytesSaved += saved;
     updateSessionStats();
@@ -2080,7 +2113,7 @@ async function stripFromPreview() {
     renderTable();
     updateStatus();
     closePreview();
-    toast(`Stripped ${filesToStrip.size} attachment${filesToStrip.size > 1 ? 's' : ''}. Saved ${formatSize(saved)}`, 'success');
+    toast(`Processed ${partIdsToStrip.size} selected attachment${partIdsToStrip.size > 1 ? 's' : ''}. Kept images used by the email. Saved ${formatSize(saved)}`, 'success');
   } catch (e) {
     toast('Strip failed: ' + e.message, 'error');
   }
@@ -2186,6 +2219,7 @@ function collectAttachments(part, list) {
   if (!part) return;
   if (part.filename && part.filename.length > 0) {
     list.push({
+      partId: part.partId,
       filename: part.filename,
       size: part.body ? part.body.size || 0 : 0,
       mimeType: part.mimeType || '',

@@ -73,6 +73,18 @@ For each email, the stripping process:
 5. Re-inserts the stripped email with original labels, thread, and read/unread state
 6. Moves the original to Trash
 
+Attachment choices use Gmail's unique message-part IDs. Two attachments can have the same filename and still be selected separately. Selecting every visible attachment keeps the same explicit selection.
+
+Before stripping, the app checks that Gmail's parsed message structure and MIME headers match the raw email. It decodes base64 and quoted-printable HTML, including the declared character set, before finding inline image references. It handles percent-encoded content IDs and common HTML character references. Untouched message parts, boundaries, preambles, and epilogues retain their original bytes.
+
+If the structure does not match, a selected part is missing, or HTML cannot be decoded safely, the app stops before inserting a copy or trashing the original. Unsupported messages need manual review. This includes selecting an entire multipart attachment or a message whose root is itself an attachment. Failed bulk operations stay visible and selected.
+
+### Local checks
+
+Run `node --test tests/attachments.test.cjs` for parser, selection, and mocked Gmail API regression tests. These tests do not use credentials or contact Gmail.
+
+For a browser check, run `node tests/browser-fixture.cjs` and open `http://127.0.0.1:9124`. The fixture contains two attachments named `same.pdf` and an inline image. Uncheck the first PDF and strip the remaining selections, using either the bulk review or email preview. A passing result appears in the header when the second PDF is removed and the first PDF and inline image remain. Reload to test the other flow. The fixture serves only synthetic email and mocks all Gmail calls.
+
 ## How it works
 
 Single HTML file with inline CSS and JavaScript. Uses [Google Identity Services](https://developers.google.com/identity/gsi/web) for OAuth and [gapi](https://github.com/google/google-api-javascript-client) for Gmail API calls (`messages.list`, `messages.get`, `messages.insert`, `messages.trash`, `messages.attachments.get`). No other dependencies.

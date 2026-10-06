@@ -13,19 +13,20 @@ Everything is in `index.html` - HTML, CSS, JS inline. The only external loads ar
 - **Search**: `messages.list` with Gmail query syntax (`larger:10M`, etc.), paginated via `nextPageToken`
 - **Preview**: `messages.get` with `format=full` for body/attachment structure, `messages.attachments.get` for attachment data
 - **Trash**: `messages.trash` (recoverable 30 days)
-- **Strip attachments**: `messages.get` with `format=raw` to get full MIME, parse/strip in JS, `messages.insert` with `internalDateSource=dateHeader` to re-insert stripped copy preserving labels/thread/read state, then `messages.trash` the original
+- **Strip attachments**: `messages.get` with `format=full` and `format=raw`, validate Gmail's MIME tree against the raw message, strip selected part IDs, `messages.insert` with `internalDateSource=dateHeader` to re-insert the stripped copy with labels/thread/read state, then `messages.trash` the original
 
 ### MIME stripping in JavaScript
 
 The MIME parser is hand-written (no library). It:
-- Splits headers from body at blank line
-- Recursively parses multipart boundaries
-- Identifies attachments by Content-Disposition/filename
-- Preserves inline images referenced by `cid:` URLs in HTML body
-- Replaces stripped attachments with text/plain stubs
-- Supports selective stripping (specific filenames via a Set, or all)
+- Splits headers from body at a blank line and parses complete multipart delimiter lines
+- Maps opaque Gmail part IDs to raw parts after checking child counts, MIME types, and identity headers
+- Carries explicit sets of selected part IDs through both bulk review and preview; never selects by filename
+- Decodes base64/quoted-printable HTML and declared charsets before resolving `cid:` references
+- Preserves referenced inline images and replaces selected attachments with UTF-8, base64-encoded text/plain stubs
+- Preserves untouched bytes, including preambles, epilogues, and delimiter whitespace
+- Stops before Gmail writes on uncertain structure, missing IDs, unsupported selected containers/root attachments, or undecodable HTML
 
-Edge cases: nested multipart, folded headers, mixed line endings (CRLF vs LF).
+Regression tests: `node --test tests/attachments.test.cjs`. Synthetic browser fixture: `node tests/browser-fixture.cjs`. Both avoid live Gmail and credentials. The parser remains deliberately conservative and does not implement every MIME or HTML syntax variation.
 
 ### Auth
 
